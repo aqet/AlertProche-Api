@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export type PostDocument = Post & Document;
-export type PostType = 'Disparition' | 'Abus' | 'Prevention';
+export type PostType = 'Disparition' | 'Abus' | 'Prevention' | 'Appel à l\'aide';
 
 @Schema({ timestamps: true })
 export class Post {
@@ -18,7 +18,7 @@ export class Post {
   @Prop({ required: true, trim: true, maxlength: 100 })
   location: string;
 
-  @Prop({ type: String, enum: ['Disparition', 'Abus', 'Prevention'], required: true })
+  @Prop({ type: String, enum: ['Disparition', 'Abus', 'Prevention', 'Appel à l\'aide'], required: true })
   type: PostType;
 
   @Prop({ default: false })

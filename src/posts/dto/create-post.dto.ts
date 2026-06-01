@@ -16,10 +16,10 @@ export class CreatePostDto {
   @MaxLength(100)
   location: string;
 
-  @IsEnum(['Disparition', 'Abus', 'Prevention'], {
-    message: 'Le type doit être Disparition, Abus ou Prevention.',
+  @IsEnum(['Disparition', 'Abus', 'Prevention', 'Appel à l\'aide'], {
+    message: 'Le type doit être Disparition, Abus, Prevention ou Appel à l\'aide.',
   })
-  type: 'Disparition' | 'Abus' | 'Prevention';
+  type: 'Disparition' | 'Abus' | 'Prevention' | 'Appel à l\'aide';
 
   @IsOptional()
   @IsBoolean()
