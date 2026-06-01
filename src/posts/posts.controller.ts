@@ -1,30 +1,18 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  UseInterceptors,
-  UploadedFile,
-  HttpCode,
-  HttpStatus,
-  BadRequestException,
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, Query, UseGuards, Request,
+  UseInterceptors, UploadedFile,
+  HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import { memoryStorage } from 'multer';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 import { IsString } from 'class-validator';
 
 class ReportDto {
@@ -32,37 +20,24 @@ class ReportDto {
   reason: string;
 }
 
-const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png'];
+const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 Mo
-
-// Multer : validation MIME avant écriture sur disque (via fileFilter)
-const imageStorage = diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = join(process.cwd(), 'uploads', 'images');
-    if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `post-${uniqueSuffix}${extname(file.originalname).toLowerCase()}`);
-  },
-});
 
 function imageFileFilter(req: any, file: Express.Multer.File, cb: any) {
   if (!ALLOWED_MIME.includes(file.mimetype)) {
-    return cb(
-      new BadRequestException(
-        `Format non supporté : ${file.mimetype}. Seuls JPG et PNG sont acceptés.`,
-      ),
-      false,
-    );
+    return cb(new BadRequestException(
+      `Format non supporté : ${file.mimetype}. Seuls JPG, PNG et WebP sont acceptés.`
+    ), false);
   }
   cb(null, true);
 }
 
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Get()
   findAll(@Query('type') type?: string, @Query('location') location?: string) {
@@ -89,28 +64,27 @@ export class PostsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: imageStorage,
-      fileFilter: imageFileFilter,
-      limits: { fileSize: MAX_SIZE },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('image', {
+    storage: memoryStorage(),   // Buffer en mémoire → Cloudinary
+    fileFilter: imageFileFilter,
+    limits: { fileSize: MAX_SIZE },
+  }))
   async create(
     @Body() dto: CreatePostDto,
     @Request() req: any,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     let imageUrl: string | undefined;
+
     if (file) {
-      // Vérification taille (double sécurité)
+      // Vérification taille
       if (file.size > MAX_SIZE) {
-        // Supprimer le fichier déjà écrit
-        try { unlinkSync(file.path); } catch { /* ignore */ }
-        throw new BadRequestException('L\'image dépasse 5 Mo. Veuillez choisir une image plus légère.');
+        throw new BadRequestException('L\'image dépasse 5 Mo.');
       }
-      imageUrl = `/uploads/images/${file.filename}`;
+      // Upload vers Cloudinary
+      imageUrl = await this.cloudinary.uploadBuffer(file.buffer, file.originalname);
     }
+
     return this.postsService.create(dto, req.user, imageUrl);
   }
 
@@ -145,7 +119,12 @@ export class PostsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.postsService.remove(id, req.user);
+  async remove(@Param('id') id: string, @Request() req: any) {
+    // Récupérer l'URL avant suppression pour nettoyer Cloudinary
+    const post = await this.postsService.findOne(id);
+    await this.postsService.remove(id, req.user);
+    if (post?.image_url) {
+      await this.cloudinary.deleteByUrl(post.image_url);
+    }
   }
 }
