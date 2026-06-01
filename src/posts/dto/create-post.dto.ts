@@ -1,0 +1,28 @@
+import { IsString, IsEnum, IsBoolean, IsOptional, MinLength, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+export class CreatePostDto {
+  @IsString()
+  @MinLength(10, { message: 'Le titre doit contenir au moins 10 caractères.' })
+  @MaxLength(150, { message: 'Le titre ne peut pas dépasser 150 caractères.' })
+  title: string;
+
+  @IsString()
+  @MinLength(30, { message: 'La description doit contenir au moins 30 caractères.' })
+  content: string;
+
+  @IsString()
+  @MinLength(2, { message: 'La localisation est requise.' })
+  @MaxLength(100)
+  location: string;
+
+  @IsEnum(['Disparition', 'Abus', 'Prevention'], {
+    message: 'Le type doit être Disparition, Abus ou Prevention.',
+  })
+  type: 'Disparition' | 'Abus' | 'Prevention';
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  isAnonymous?: boolean;
+}
