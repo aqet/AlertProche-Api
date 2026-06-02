@@ -18,8 +18,8 @@ export class MailService {
   }
 
   private initTransporter(): void {
-    this.smtpUser = this.config.get<string>('SMTP_USER') || 'tientcheuigorcarel@gmail.com';
-    const smtpPass = this.config.get<string>('SMTP_PASS') || 'hqez izyx jkjg iroq';
+    this.smtpUser = this.config.get<string>('SMTP_USER');
+    const smtpPass = this.config.get<string>('SMTP_PASS');
 
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
