@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Tâche créée</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 0;
+    }
+ 
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      color: #064e18;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    p {
+      color: #333;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .task-box {
+      background: #f0f4ff;
+      border-left: 4px solid #0aac3a;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .task-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .footer {
+      margin-top: 30px;
+      font-size: 13px;
+      color: #777;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1> Tâche créée avec succès</h1>
+
+    <p>Bonjour <strong>{{username}}</strong>, </p>
+
+    <p>
+      Ta nouvelle tâche a bien été ajoutée à ta liste.
+      Voici les détails :
+    </p>
+
+    <div class="task-box">
+      <div class="task-title">{{taskTitle}}</div>
+
+    </div>
+
+    <p>
+      Tu peux maintenant la deplacer
+      directement depuis ton application.
+    </p>
+
+    <p>Bon courage et bonne organisation </p>
+
+    <div class="footer">
+      <p>
+        Cet email a été envoyé automatiquement par <strong>Todo App</strong>.
+        <br />
+        Merci de ne pas y répondre.
+      </p>
+    </div>
+  </div>
+</body>
+
+</html>

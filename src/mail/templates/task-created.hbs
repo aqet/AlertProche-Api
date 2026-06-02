@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tâche créée</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 32px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      color: #5cb146;
+      font-size: 26px;
+      margin: 0;
+    }
+
+    p {
+      color: #374151;
+      line-height: 1.7;
+      font-size: 15px;
+      margin: 14px 0;
+    }
+
+    .task-box {
+      background: #eef2ff;
+      border-left: 5px solid #378822;
+      padding: 18px 20px;
+      margin: 24px 0;
+      border-radius: 8px;
+    }
+
+    .task-title {
+      font-weight: 600;
+      font-size: 18px;
+      color: #4c913b;
+    }
+
+    .username {
+      color: #437437;
+      font-weight: 600;
+    }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 13px;
+      color: #6b7280;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>Tâche créée avec succès</h1>
+    </div>
+
+    <p>
+      Bonjour <span class="username">{{username}}</span>,
+    </p>
+
+    <p>
+      Ta nouvelle tâche a bien été ajoutée à ta liste.  
+      Voici les détails :
+    </p>
+
+    <div class="task-box">
+      <div class="task-title">{{taskTitle}}</div>
+    </div>
+
+    <p>
+      Tu peux maintenant la déplacer directement depuis ton application Todo.
+    </p>
+
+    <p>
+      Bon courage et excellente organisation 
+    </p>
+
+    <div class="footer">
+      Cet email a été envoyé automatiquement par <strong>Todo App</strong>.<br />
+      Merci de ne pas y répondre.
+    </div>
+
+  </div>
+</body>
+</html>
