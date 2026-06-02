@@ -60,7 +60,7 @@ export class PostsService {
     // Modération
     this.moderationService.validateOrThrow(dto.title);
     this.moderationService.validateOrThrow(dto.content);
-    console.log(dto);
+    console.log(dto.isAnonymous);
     
     const post = await this.postModel.create({
       author_id: new Types.ObjectId(user._id.toString()),
@@ -68,7 +68,7 @@ export class PostsService {
       content: dto.content,
       location: dto.location,
       type: dto.type,
-      isAnonymous: dto.isAnonymous || false,
+      isAnonymous: false,
       image_url: imageUrl || null,
       isActive: true,
     });
