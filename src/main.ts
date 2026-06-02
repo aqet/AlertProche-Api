@@ -41,7 +41,7 @@ async function setupApp(app: NestExpressApplication) {
       return callback(new Error(`CORS: origine non autorisée — ${origin}`));
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS', 'PUT', 'HEAD'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'x-verify-token'],
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
