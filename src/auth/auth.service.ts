@@ -50,12 +50,12 @@ export class AuthService {
     });
 
     // Envoyer email — si l'envoi échoue, on remonte l'erreur
-    const sent = await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
-    if (!sent) {
+    const result = await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
+    if (!result.success) {
       // Nettoyer l'OTP créé
       await this.otpModel.deleteMany({ email });
       throw new BadRequestException(
-        'Impossible d\'envoyer le code à cette adresse email. Vérifiez que l\'adresse est valide et réessayez.',
+        result.error || 'Impossible d\'envoyer le code. Vérifiez l\'adresse email et réessayez.',
       );
     }
 
