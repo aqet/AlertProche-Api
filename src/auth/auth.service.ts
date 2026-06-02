@@ -49,8 +49,15 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
     });
 
-    // Envoyer email
-    await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
+    // Envoyer email — si l'envoi échoue, on remonte l'erreur
+    const sent = await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
+    if (!sent) {
+      // Nettoyer l'OTP créé
+      await this.otpModel.deleteMany({ email });
+      throw new BadRequestException(
+        'Impossible d\'envoyer le code à cette adresse email. Vérifiez que l\'adresse est valide et réessayez.',
+      );
+    }
 
     return { message: `Code OTP envoyé à ${email}. Valable 10 minutes.` };
   }
