@@ -60,7 +60,8 @@ export class PostsService {
     // Modération
     this.moderationService.validateOrThrow(dto.title);
     this.moderationService.validateOrThrow(dto.content);
-
+    console.log(dto);
+    
     const post = await this.postModel.create({
       author_id: new Types.ObjectId(user._id.toString()),
       title: dto.title,
