@@ -77,16 +77,20 @@ export class CommentsService {
 
   private async enrichComment(comment: any, authorUser?: any) {
     let authorPseudo = 'Anonyme';
-    if (!comment.isAnonymous) {
+    if (comment.isAnonymous === false || comment.isAnonymous === 'false') {
       if (authorUser) {
-        authorPseudo = authorUser.pseudo;
+        authorPseudo = authorUser.pseudo || 'Inconnu';
       } else {
-        const author = await this.commentModel.db
-          .model('User')
-          .findById(comment.author_id)
-          .select('pseudo')
-          .lean() as any;
-        authorPseudo = author?.pseudo || 'Inconnu';
+        try {
+          const author = await this.commentModel.db
+            .model('User')
+            .findById(comment.author_id)
+            .select('pseudo')
+            .lean() as any;
+          authorPseudo = author?.pseudo || 'Inconnu';
+        } catch {
+          authorPseudo = 'Inconnu';
+        }
       }
     }
 
@@ -95,7 +99,7 @@ export class CommentsService {
       post_id: comment.post_id.toString(),
       author_id: comment.author_id.toString(),
       authorPseudo,
-      isAnonymous: comment.isAnonymous,
+      isAnonymous: comment.isAnonymous === true || comment.isAnonymous === 'true',
       content: comment.content,
       createdAt: comment.createdAt,
     };

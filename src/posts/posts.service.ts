@@ -151,16 +151,23 @@ export class PostsService {
     });
 
     let authorPseudo = 'Anonyme';
-    if (!post.isAnonymous) {
+
+    // N'afficher le pseudo que si isAnonymous est explicitement false
+    if (post.isAnonymous === false || post.isAnonymous === 'false') {
       if (authorUser) {
-        authorPseudo = authorUser.pseudo;
+        // Le user peut être un doc Mongoose ou un objet plain
+        authorPseudo = authorUser.pseudo || authorUser?.toObject?.()?.pseudo || 'Inconnu';
       } else {
-        const author = await this.postModel.db
-          .model('User')
-          .findById(post.author_id)
-          .select('pseudo')
-          .lean() as any;
-        authorPseudo = author?.pseudo || 'Inconnu';
+        try {
+          const author = await this.postModel.db
+            .model('User')
+            .findById(post.author_id)
+            .select('pseudo')
+            .lean() as any;
+          authorPseudo = author?.pseudo || 'Inconnu';
+        } catch {
+          authorPseudo = 'Inconnu';
+        }
       }
     }
 
@@ -168,7 +175,7 @@ export class PostsService {
       _id: post._id.toString(),
       author_id: post.author_id.toString(),
       authorPseudo,
-      isAnonymous: post.isAnonymous,
+      isAnonymous: post.isAnonymous === true || post.isAnonymous === 'true',
       title: post.title,
       content: post.content,
       location: post.location,
