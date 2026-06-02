@@ -21,12 +21,20 @@ export class CreatePostDto {
   })
   type: 'Disparition' | 'Abus' | 'Prevention' | 'Appel à l\'aide';
 
+  // @IsOptional()
+  // @IsBoolean()
+  // @Transform(({ value }) => {
+  //   if (value === 'true' || value === true) return true;
+  //   if (value === 'false' || value === false || value === undefined || value === null) return false;
+  //   return false;
+  // })
+  // isAnonymous?: boolean;
   @IsOptional()
-  @IsBoolean()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false || value === undefined || value === null) return false;
-    return false;
-  })
-  isAnonymous?: boolean;
+  @IsString()
+  // @Transform(({ value }) => {
+  //   if (value === 'true' || value === true) return true;
+  //   if (value === 'false' || value === false || value === undefined || value === null) return false;
+  //   return false;
+  // })
+  isAnonymous?: string;
 }

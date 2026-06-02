@@ -68,7 +68,7 @@ export class PostsService {
       content: dto.content,
       location: dto.location,
       type: dto.type,
-      isAnonymous: false,
+      isAnonymous: dto.isAnonymous,
       image_url: imageUrl || null,
       isActive: true,
     });
