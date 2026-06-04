@@ -50,11 +50,11 @@ export class ModerationService {
     }
 
     // 2. Filtre anti-doxxing — téléphones
-    for (const pattern of this.PHONE_PATTERNS) {
-      if (pattern.test(text)) {
-        return { isClean: false, reason: 'phone', flaggedWord: 'numéro de téléphone' };
-      }
-    }
+    // for (const pattern of this.PHONE_PATTERNS) {
+    //   if (pattern.test(text)) {
+    //     return { isClean: false, reason: 'phone', flaggedWord: 'numéro de téléphone' };
+    //   }
+    // }
 
     // 3. Filtre anti-doxxing — identifiants
     for (const pattern of this.ID_PATTERNS) {
