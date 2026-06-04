@@ -19,13 +19,13 @@ export class ModerationService {
   ];
 
   // Regex anti-doxxing — numéros de téléphone camerounais
-  private readonly PHONE_PATTERNS = [
-    /\b(6[5-9]\d{7})\b/,
-    /\b(2[23]\d{7})\b/,
-    /\+237\s?\d{8,9}/,
-    /\b00237\s?\d{8,9}\b/,
-    /\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{3,4}\b/,
-  ];
+  // private readonly PHONE_PATTERNS = [
+  //   /\b(6[5-9]\d{7})\b/,
+  //   /\b(2[23]\d{7})\b/,
+  //   /\+237\s?\d{8,9}/,
+  //   /\b00237\s?\d{8,9}\b/,
+  //   /\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{3,4}\b/,
+  // ];
 
   // Regex anti-doxxing — identifiants officiels
   private readonly ID_PATTERNS = [
