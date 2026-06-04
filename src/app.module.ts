@@ -7,6 +7,7 @@ import { CommentsModule } from './comments/comments.module';
 import { ModerationModule } from './common/moderation/moderation.module';
 import { AdminModule } from './admin/admin.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { ShareModule } from './share/share.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     ModerationModule,
     AdminModule,
     ReviewsModule,
+    ShareModule,
   ],
 })
 export class AppModule {}
