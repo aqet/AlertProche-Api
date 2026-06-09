@@ -5,7 +5,7 @@ import { PostsService } from '../posts/posts.service';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://alert-proche.vercel.app';
 const SITE_NAME    = 'AlertProche';
 const SITE_SLOGAN  = 'Protéger les personnes vulnérables, c\'est l\'affaire de tous.';
-const FALLBACK_IMG = `${FRONTEND_URL}/favicon1.ico`;
+const FALLBACK_IMG = `${FRONTEND_URL}/favicon.ico`;
 
 const TYPE_EMOJI: Record<string, string> = {
   'Disparition':    '🚨',

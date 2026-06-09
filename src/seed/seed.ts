@@ -37,15 +37,12 @@ const CommentSchema = new mongoose.Schema(
 );
 
 async function seed() {
-  console.log('🔌 Connexion à MongoDB...');
-  console.log(`   URI: ${MONGODB_URI!.replace(/:([^@]+)@/, ':****@')}`);
 
   await mongoose.connect(MONGODB_URI!, {
     serverSelectionTimeoutMS: 15000,
     connectTimeoutMS: 15000,
     socketTimeoutMS: 30000,
   });
-  console.log('✅ Connecté à MongoDB\n');
 
   const UserModel = mongoose.models['User'] || mongoose.model('User', UserSchema);
   const PostModel = mongoose.models['Post'] || mongoose.model('Post', PostSchema);
@@ -54,7 +51,6 @@ async function seed() {
   await UserModel.deleteMany({});
   await PostModel.deleteMany({});
   await CommentModel.deleteMany({});
-  console.log('🗑️  Collections nettoyées');
 
   const adminPwd  = await bcrypt.hash('Admin2026!', 12);
   const modPwd    = await bcrypt.hash('Modo2026!', 12);
@@ -66,7 +62,6 @@ async function seed() {
     { email: 'marie@example.cm',           password: userPwd,  pseudo: 'Marie_Cam',     role: 'Standard' },
     { email: 'citoyen@example.cm',         password: userPwd,  pseudo: 'CitoyenDouala', role: 'Standard' },
   ]);
-  console.log('👥 4 utilisateurs créés');
 
   const posts = await (PostModel.insertMany as any)([
     {
@@ -112,7 +107,6 @@ async function seed() {
       isActive: true, isReported: false, reportReasons: [],
     },
   ]);
-  console.log('📝 6 publications créées');
 
   await (CommentModel.insertMany as any)([
     {
@@ -136,29 +130,21 @@ async function seed() {
       isAnonymous: false,
     },
   ]);
-  console.log('💬 4 commentaires créés');
 
-  console.log('\n✅ Seed terminé avec succès !');
-  console.log('\n📋 Comptes de démo :');
-  console.log('  Admin      : admin@alertproche.cm        / Admin2026!');
-  console.log('  Modérateur : moderateur@alertproche.cm   / Modo2026!');
-  console.log('  Standard   : marie@example.cm            / User2026!');
-  console.log('  Standard   : citoyen@example.cm          / User2026!');
+  
 
   await mongoose.disconnect();
-  console.log('\n👋 Déconnecté de MongoDB');
   setTimeout(() => process.exit(0), 500);
 }
 
 seed().catch(err => {
-  console.error('\n❌ Erreur seed:', err.message || err);
 
   if (err.name === 'MongoNetworkError' || err.name === 'MongoServerSelectionError') {
-    console.error('\n💡 Solutions possibles :');
-    console.error('   1. MongoDB Atlas → Network Access → Ajouter votre IP (ou 0.0.0.0/0)');
-    console.error('   2. Vérifier que l\'URI dans .env est correcte');
-    console.error('   3. Vérifier votre connexion internet');
-    console.error('   4. Utiliser MongoDB local : MONGODB_URI=mongodb://localhost:27017/alertproche');
+    // console.error('\n💡 Solutions possibles :');
+    // console.error('   1. MongoDB Atlas → Network Access → Ajouter votre IP (ou 0.0.0.0/0)');
+    // console.error('   2. Vérifier que l\'URI dans .env est correcte');
+    // console.error('   3. Vérifier votre connexion internet');
+    // console.error('   4. Utiliser MongoDB local : MONGODB_URI=mongodb://localhost:27017/alertproche');
   }
   process.exit(1);
 });

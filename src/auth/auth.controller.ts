@@ -54,6 +54,8 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterWithTokenDto) {
     const { verifyToken, ...registerData } = dto;
+    console.log({ verifyToken, registerData});
+    
     return this.authService.register(registerData, verifyToken);
   }
 

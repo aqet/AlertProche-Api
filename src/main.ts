@@ -73,7 +73,5 @@ if (process.env.NODE_ENV !== 'production') {
     await setupApp(app);
     const port = process.env.PORT || 3000;
     await app.listen(port);
-    console.log(`\n🚀 AlertProche API — http://localhost:${port}`);
-    console.log(`📦 MongoDB: ${process.env.MONGODB_URI?.replace(/:([^@]+)@/, ':****@')}`);
   })();
 }

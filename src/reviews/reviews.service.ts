@@ -39,7 +39,7 @@ export class ReviewsService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .lean()
+        // .lean()
         .exec(),
       this.reviewModel.countDocuments({ isVisible: true }),
     ]);
