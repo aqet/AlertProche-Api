@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
+import { json, urlencoded } from 'express';
 
 // Origines autorisées — frontend déployé + développement local
 const ALLOWED_ORIGINS = [
@@ -15,6 +16,10 @@ const ALLOWED_ORIGINS = [
 let cachedServer: any;
 
 async function setupApp(app: NestExpressApplication) {
+
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
+
   // Validation globale des DTOs
   app.useGlobalPipes(
     new ValidationPipe({

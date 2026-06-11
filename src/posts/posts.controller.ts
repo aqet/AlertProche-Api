@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Patch, Delete,
   Body, Param, Query, UseGuards, Request,
   UseInterceptors, UploadedFile,
-  HttpCode, HttpStatus, BadRequestException,
+  HttpCode, HttpStatus, BadRequestException, HttpException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -13,11 +13,22 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
-import { IsString } from 'class-validator';
+import { IsNotEmpty, isString, IsString } from 'class-validator';
+import { AiService } from 'src/ai/ai.service';
 
 class ReportDto {
   @IsString()
   reason: string;
+}
+
+export class AnalyzeImageDto {
+  @IsString()
+  @IsNotEmpty()
+  image: string;    // La chaîne Base64 complète envoyée par Angular
+  
+  @IsString()
+  @IsNotEmpty()
+  mimeType: string; // ex: "image/jpeg"
 }
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -37,6 +48,7 @@ export class PostsController {
   constructor(
     private readonly postsService: PostsService,
     private readonly cloudinary: CloudinaryService,
+    private readonly aiService: AiService
   ) {}
 
   @Get()
@@ -60,6 +72,24 @@ export class PostsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postsService.findOne(id);
+  }
+
+  @Post('analyze-image')
+  @UseGuards(JwtAuthGuard)
+  async analyzeImageForCompletion(@Body() body: AnalyzeImageDto) {
+    console.log(body);
+    
+    if (!body.image) throw new HttpException('Image Base64 manquante.', HttpStatus.BAD_REQUEST);
+
+    // 💡 SÉCURITÉ : Nettoyer la chaîne Base64 si le frontend envoie le préfixe 'data:image/...;base64,'
+    let base64Data = body.image;
+    if (base64Data.includes(',')) {
+      base64Data = base64Data.split(',')[1];
+    }
+
+    const completion = await this.aiService.autocompleteFormFromImage(base64Data, body.mimeType);
+    
+    return { success: true, completion: completion };
   }
 
   @Post()
@@ -103,9 +133,9 @@ export class PostsController {
 
   @Post(':id/report')
   @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  report(@Param('id') id: string, @Body() body: ReportDto) {
-    return this.postsService.report(id, body.reason || 'Non précisé');
+  // @HttpCode(HttpStatus.NO_CONTENT)
+  async report(@Param('id') id: string, @Body() body: ReportDto) {
+    return await this.postsService.report(id, body.reason || 'Non précisé');
   }
 
   @Delete(':id/report')

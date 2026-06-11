@@ -10,6 +10,7 @@ import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
+import { AiService } from 'src/ai/ai.service';
 
 @Injectable()
 export class PostsService {
@@ -17,12 +18,14 @@ export class PostsService {
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     private moderationService: ModerationService,
+    private aiService: AiService,
   ) {}
 
   async findAll(filters?: { type?: string; location?: string }) {
     const query: any = {};
     if (filters?.type) query.type = filters.type;
-    if (filters?.location) query.location = { $regex: filters.location, $options: 'i' };
+    if (filters?.location)
+      query.location = { $regex: filters.location, $options: 'i' };
 
     const posts = await this.postModel
       .find(query)
@@ -30,11 +33,12 @@ export class PostsService {
       .lean();
 
     // Enrichir avec pseudo auteur et compteur commentaires
-    return Promise.all(posts.map(p => this.enrichPost(p)));
+    return Promise.all(posts.map((p) => this.enrichPost(p)));
   }
 
   async findOne(id: string) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Publication introuvable.');
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
     const post = await this.postModel.findById(id).lean();
     if (!post) throw new NotFoundException('Publication introuvable.');
     return this.enrichPost(post);
@@ -45,7 +49,7 @@ export class PostsService {
       .find({ author_id: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
       .lean();
-    return Promise.all(posts.map(p => this.enrichPost(p)));
+    return Promise.all(posts.map((p) => this.enrichPost(p)));
   }
 
   async findReported() {
@@ -53,37 +57,52 @@ export class PostsService {
       .find({ isReported: true })
       .sort({ createdAt: -1 })
       .lean();
-    return Promise.all(posts.map(p => this.enrichPost(p)));
+    return Promise.all(posts.map((p) => this.enrichPost(p)));
   }
 
   async create(dto: CreatePostDto, user: any, imageUrl?: string) {
     // Modération
-    this.moderationService.validateOrThrow(dto.title);
-    this.moderationService.validateOrThrow(dto.content);
-    console.log(dto.isAnonymous);
-    
-    const post = await this.postModel.create({
-      author_id: new Types.ObjectId(user._id.toString()),
-      title: dto.title,
-      content: dto.content,
-      location: dto.location,
-      type: dto.type,
-      isAnonymous: dto.isAnonymous,
-      image_url: imageUrl || null,
-      isActive: true,
-    });
+    // this.moderationService.validateOrThrow(dto.title);
+    // this.moderationService.validateOrThrow(dto.content);
 
-    return this.enrichPost(post.toObject(), user);
+    let aiResult = this.aiService.moderateContent(dto.title);
+    if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+      return aiResult;
+    } else {
+      aiResult = this.aiService.moderateContent(dto.content);
+      if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+        return aiResult;
+      } else {
+        const post = await this.postModel.create({
+          author_id: new Types.ObjectId(user._id.toString()),
+          title: dto.title,
+          content: dto.content,
+          location: dto.location,
+          type: dto.type,
+          isAnonymous: dto.isAnonymous,
+          image_url: imageUrl || null,
+          isActive: true,
+        });
+
+        return this.enrichPost(post.toObject(), user);
+      }
+    }
   }
 
   async update(id: string, dto: UpdatePostDto, user: any) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Publication introuvable.');
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
     const post = await this.postModel.findById(id);
     if (!post) throw new NotFoundException('Publication introuvable.');
 
     // Vérifier propriété (sauf Admin/Modérateur)
-    if (user.role === 'Standard' && post.author_id.toString() !== user._id.toString()) {
-      throw new ForbiddenException('Vous ne pouvez modifier que vos propres publications.');
+    if (
+      user.role === 'Standard' &&
+      post.author_id.toString() !== user._id.toString()
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez modifier que vos propres publications.',
+      );
     }
 
     if (dto.title) this.moderationService.validateOrThrow(dto.title);
@@ -97,7 +116,8 @@ export class PostsService {
   }
 
   async toggleActive(id: string, user: any) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Publication introuvable.');
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
     const post = await this.postModel.findById(id);
     if (!post) throw new NotFoundException('Publication introuvable.');
 
@@ -106,21 +126,56 @@ export class PostsService {
     }
 
     const updated = await this.postModel
-      .findByIdAndUpdate(id, { $set: { isActive: !post.isActive } }, { new: true })
+      .findByIdAndUpdate(
+        id,
+        { $set: { isActive: !post.isActive } },
+        { new: true },
+      )
       .lean();
 
     return this.enrichPost(updated!);
   }
 
   async report(id: string, reason: string) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Publication introuvable.');
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
     const post = await this.postModel.findById(id);
     if (!post) throw new NotFoundException('Publication introuvable.');
 
+    const aiResult = await this.aiService.moderateContent(post.content, reason);
+    // Paramètres de décision par défaut
+    let autoBanned = false;
+    let statusUpdate = 'PENDING_HUMAN_REVIEW';
+
+    // 3. Logique décisionnelle sécurisée (Human-in-the-loop)
+    // On n'automatise le bannissement que si l'IA est formelle (confiance supérieure à 85%)
+    if (aiResult.decision === 'BAN' && aiResult.confidence >= 0.9) {
+      autoBanned = true;
+      statusUpdate = 'ARCHIVED_BY_AI';
+    }
+
     await this.postModel.findByIdAndUpdate(id, {
-      $set: { isReported: true },
-      $addToSet: { reportReasons: reason },
+      $set: {
+        isReported: true,
+        isActive: !autoBanned,
+      },
+      $addToSet: {
+        reportReasons: `${reason} (Analyse IA : ${aiResult.decision} - ${aiResult.reasoning} - Confiance : ${aiResult.confidence * 100}%)`,
+      },
     });
+
+    return {
+      success: true,
+      autoBanned: autoBanned,
+      message: autoBanned
+        ? 'Ce contenu a été temporairement masqué suite à une détection automatique de violation des règles.'
+        : 'Votre signalement a bien été pris en compte et va être analysé.',
+      aiAnalysis: {
+        decision: aiResult.decision,
+        confidence: aiResult.confidence,
+        reason: aiResult.reasoning,
+      },
+    };
   }
 
   async clearReport(id: string, user: any) {
@@ -133,12 +188,18 @@ export class PostsService {
   }
 
   async remove(id: string, user: any) {
-    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Publication introuvable.');
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
     const post = await this.postModel.findById(id);
     if (!post) throw new NotFoundException('Publication introuvable.');
 
-    if (user.role === 'Standard' && post.author_id.toString() !== user._id.toString()) {
-      throw new ForbiddenException('Vous ne pouvez supprimer que vos propres publications.');
+    if (
+      user.role === 'Standard' &&
+      post.author_id.toString() !== user._id.toString()
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez supprimer que vos propres publications.',
+      );
     }
 
     // Supprimer en cascade les commentaires
@@ -157,14 +218,15 @@ export class PostsService {
     if (post.isAnonymous === false || post.isAnonymous === 'false') {
       if (authorUser) {
         // Le user peut être un doc Mongoose ou un objet plain
-        authorPseudo = authorUser.pseudo || authorUser?.toObject?.()?.pseudo || 'Inconnu';
+        authorPseudo =
+          authorUser.pseudo || authorUser?.toObject?.()?.pseudo || 'Inconnu';
       } else {
         try {
-          const author = await this.postModel.db
+          const author = (await this.postModel.db
             .model('User')
             .findById(post.author_id)
             .select('pseudo')
-            .lean() as any;
+            .lean()) as any;
           authorPseudo = author?.pseudo || 'Inconnu';
         } catch {
           authorPseudo = 'Inconnu';
