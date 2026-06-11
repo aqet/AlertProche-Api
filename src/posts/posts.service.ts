@@ -60,10 +60,43 @@ export class PostsService {
     return Promise.all(posts.map((p) => this.enrichPost(p)));
   }
 
-  async create(dto: CreatePostDto, user: any, imageUrl?: string) {
+  async searchSimilarImages(fileBuffer: Buffer, mimeType: string) {
+    // 1️⃣ Conversion du Buffer brut en Base64 pour l'API Gemini
+    const base64Image = fileBuffer.toString('base64');
+
+    // 2️⃣ Appel à Gemini pour générer l'Embedding (la signature mathématique)
+    const response = await this.aiService.generateImageEmbedding(base64Image, mimeType);
+
+    const targetEmbedding = response; // Notre tableau de 1408 nombres
+
+    // 3️⃣ Requête vectorielle dans MongoDB Atlas
+    return this.postModel.aggregate([
+      {
+        $vectorSearch: {
+          index: 'vector_index_alertProche',          // Le nom de ton index sur Atlas
+          path: 'imageEmbedding',         // Le champ dans ton schéma MongoDB
+          queryVector: targetEmbedding,   // Les 1408 nombres de l'image recherchée
+          numCandidates: 100,             // Analyse les 100 documents les plus proches
+          limit: 5                        // Renvoie le top 5 des meilleurs résultats
+        }
+      },
+      {
+        $project: {
+          title: 1,
+          imageUrl: 1,
+          location: 1,
+          score: { $meta: 'vectorSearchScore' } // Donne la jauge de ressemblance (0 à 1)
+        }
+      }
+    ]);
+  }
+
+  async create(dto: CreatePostDto, user: any, file: Express.Multer.File, imageUrl?: string) {
     // Modération
     // this.moderationService.validateOrThrow(dto.title);
     // this.moderationService.validateOrThrow(dto.content);
+    const base64Image = file.buffer.toString('base64');
+    const imageEmbedding = await this.aiService.generateImageEmbedding(base64Image, file.mimetype);
 
     let aiResult = this.aiService.moderateContent(dto.title);
     if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
@@ -81,6 +114,7 @@ export class PostsService {
           type: dto.type,
           isAnonymous: dto.isAnonymous,
           image_url: imageUrl || null,
+          imageEmbedding: imageEmbedding,
           isActive: true,
         });
 
