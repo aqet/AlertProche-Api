@@ -77,7 +77,6 @@ export class PostsController {
   @Post('analyze-image')
   @UseGuards(JwtAuthGuard)
   async analyzeImageForCompletion(@Body() body: AnalyzeImageDto) {
-    console.log(body);
     
     if (!body.image) throw new HttpException('Image Base64 manquante.', HttpStatus.BAD_REQUEST);
 
@@ -115,7 +114,16 @@ export class PostsController {
       imageUrl = await this.cloudinary.uploadBuffer(file.buffer, file.originalname);
     }
 
-    return this.postsService.create(dto, req.user, imageUrl);
+    return this.postsService.create(dto, req.user, file, imageUrl);
+  }
+
+  @Post('search-by-image')
+  @UseInterceptors(FileInterceptor('image')) // Intercepte le fichier nommé 'image'
+  async searchByImage(@UploadedFile() file: Express.Multer.File) {
+    
+    // 💡 Ici, 'file.buffer' contient tes octets bruts (ex: <Buffer 89 50 4e 47...>)
+    // On passe le buffer et le type (image/png) au service
+    return this.postsService.searchSimilarImages(file.buffer, file.mimetype);
   }
 
   @Patch(':id')

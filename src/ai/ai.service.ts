@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { throwError } from 'rxjs';
 
 export interface ModerationResult {
   decision: 'APPROVE' | 'BAN';
@@ -148,5 +149,35 @@ export class AiService {
       cityName: '',
       confidence: 0.0
     };
+  }
+
+  async generateImageEmbedding(imageBase64: string, mimeType: string): Promise<number[]> {
+    try {
+      console.log(`[IA EMBEDDING] Calcul de la signature vectorielle de la photo...`);
+
+      const response = await this.ai.models.embedContent({
+        model: 'gemini-embedding-2', // Le modèle multimodal de Google dédié aux vecteurs
+        contents: [
+          {
+            inlineData: {
+              data: imageBase64,
+              mimeType: mimeType,
+            },
+          },
+        ],
+      });
+
+      if (!response.embeddings || !response.embeddings.values) {
+        throw new Error("L'API Google n'a retourné aucun vecteur valide.");
+      }
+
+      // Renvoie le tableau brut de 1408 nombres décimaux
+      console.log("🚀 NOMBRE DE DIMENSIONS REÇU :", response.embeddings[0].values.length);
+      return response.embeddings[0].values;
+
+    } catch (error: any) {
+      console.error(`❌ Échec du calcul de l'embedding :`, error.message);
+      throw new InternalServerErrorException("Impossible d'analyser l'empreinte visuelle de l'image.");
+  }
   }
 }

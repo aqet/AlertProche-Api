@@ -27,6 +27,9 @@ export class Post {
   @Prop({ default: null })
   image_url: string;
 
+  @Prop({ type: [Number], required: false })
+  imageEmbedding: number[];
+
   @Prop({ default: true })
   isActive: boolean;
 
