@@ -6,6 +6,7 @@ import { Post, PostSchema } from '../schemas/post.schema';
 import { Comment, CommentSchema } from '../schemas/comment.schema';
 import { ModerationModule } from '../common/moderation/moderation.module';
 import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
+import { AiModule } from 'src/ai/ai.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
     ]),
     ModerationModule,
     CloudinaryModule,
+    AiModule
   ],
   controllers: [PostsController],
   providers: [PostsService],

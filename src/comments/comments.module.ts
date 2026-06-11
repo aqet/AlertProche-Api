@@ -5,6 +5,7 @@ import { CommentsService } from './comments.service';
 import { Comment, CommentSchema } from '../schemas/comment.schema';
 import { Post, PostSchema } from '../schemas/post.schema';
 import { ModerationModule } from '../common/moderation/moderation.module';
+import { AiModule } from 'src/ai/ai.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ModerationModule } from '../common/moderation/moderation.module';
       { name: Post.name, schema: PostSchema },
     ]),
     ModerationModule,
+    AiModule
   ],
   controllers: [CommentsController],
   providers: [CommentsService],
