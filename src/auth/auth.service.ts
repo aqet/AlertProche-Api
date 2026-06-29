@@ -109,6 +109,7 @@ export class AuthService {
       password: hashedPassword,
       pseudo: dto.pseudo,
       role: 'Standard',
+      location: dto.location
     });
 
     // Nettoyer les OTP
@@ -129,12 +130,12 @@ export class AuthService {
   }
 
   // ── PROFIL ────────────────────────────────────────────────────────
-  async updatePseudo(userId: string, pseudo: string): Promise<any> {
+  async updateAccount(userId: string, pseudo: string, location: string): Promise<any> {
     const exists = await this.userModel.findOne({ pseudo, _id: { $ne: userId } });
     if (exists) throw new ConflictException('Ce pseudo est déjà pris.');
 
     const user = await this.userModel
-      .findByIdAndUpdate(userId, { pseudo }, { new: true })
+      .findByIdAndUpdate(userId, { pseudo, location }, { new: true })
       .select('-password');
     if (!user) throw new NotFoundException('Utilisateur introuvable.');
     return user;

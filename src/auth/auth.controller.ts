@@ -29,11 +29,14 @@ class RegisterWithTokenDto extends RegisterDto {
   verifyToken: string;
 }
 
-class UpdatePseudoDto {
+class UpdateAccoumtDto {
   @IsString()
   @MinLength(3)
   @MaxLength(30)
   pseudo: string;
+
+  @IsString()
+  location: string;
 }
 
 @Controller('auth')
@@ -69,9 +72,9 @@ export class AuthController {
     return this.authService.getProfile(req.user._id.toString());
   }
 
-  @Patch('profile/pseudo')
+  @Patch('profile/Account')
   @UseGuards(JwtAuthGuard)
-  updatePseudo(@Request() req: any, @Body() body: UpdatePseudoDto) {
-    return this.authService.updatePseudo(req.user._id.toString(), body.pseudo);
+  updateAccount(@Request() req: any, @Body() body: UpdateAccoumtDto) {
+    return this.authService.updateAccount(req.user._id.toString(), body.pseudo, body.location);
   }
 }
