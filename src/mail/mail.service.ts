@@ -65,10 +65,10 @@ export class MailService {
     const updateLocationUrl = `${baseUrl}/dashboard`; // Ajuste le chemin selon tes routes
 
     // 3. Rendu du template avec les bonnes variables
-    const html = this.renderTemplate('locationUpdateMail', {
+    const html = this.renderTemplate('generalMail', {
       pseudo,
       email: to,
-      update_location_url: updateLocationUrl,
+      update_location_url: "https://alert-proche.vercel.app/dashboard",
     });
 
     // 4. Envoi du mail avec un objet percutant
