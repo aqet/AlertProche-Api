@@ -50,8 +50,8 @@ export class AuthService {
     });
 
     // Envoyer email
-    // await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
-    await this.mailService.sendLocationUpdateMail(email, dto.pseudo);
+    await this.mailService.sendOtpEmail(email, dto.pseudo, rawCode);
+    // await this.mailService.sendLocationUpdateMail(email, dto.pseudo);
 
     return { message: `Code OTP envoyé à ${email}. Valable 10 minutes.` };
   }
