@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mise à jour de votre localisation — AlertProche</title>
+  <title>Alerte Urgente — AlertProche</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0f1e; color: #e8eaf6; }
     .wrapper { max-width: 560px; margin: 0 auto; padding: 40px 20px; }
     .card {
       background: #131929;
-      border: 1px solid rgba(0,212,170,0.2);
+      border: 1px solid rgba(255, 74, 74, 0.2); /* Bordure subtilement rouge pour l'alerte */
       border-radius: 16px;
       overflow: hidden;
     }
@@ -19,7 +19,7 @@
       background: linear-gradient(135deg, #0f1629, #1a2340);
       padding: 32px 40px;
       text-align: center;
-      border-bottom: 1px solid rgba(0,212,170,0.15);
+      border-bottom: 1px solid rgba(255, 74, 74, 0.15);
     }
     .logo {
       display: inline-flex;
@@ -42,7 +42,7 @@
     .logo-accent { color: #00d4aa; }
     .header-tagline {
       font-size: 12px;
-      color: #4a5568;
+      color: #718096;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
@@ -58,7 +58,52 @@
       font-size: 14px;
       color: #8892b0;
       line-height: 1.7;
+      margin-bottom: 24px;
+    }
+    /* Badge & Case Details Box */
+    .alert-badge {
+      display: inline-block;
+      background: rgba(255, 74, 74, 0.15);
+      border: 1px solid #ff4b4b;
+      color: #ff4b4b;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    .case-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
       margin-bottom: 28px;
+    }
+    .case-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #e8eaf6;
+      margin-bottom: 14px;
+    }
+    .case-field {
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: #8892b0;
+    }
+    .case-field strong {
+      color: #e8eaf6;
+    }
+    .case-description {
+      font-size: 13px;
+      color: #8892b0;
+      line-height: 1.6;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 12px;
+      border-left: 3px solid #ff4b4b;
     }
     /* CTA Button */
     .cta-container {
@@ -67,20 +112,20 @@
     }
     .cta-button {
       display: inline-block;
-      background: #4ba44b;
-      color: white !important; 
+      background: #ff4b4b; /* Rouge vif pour l'urgence */
+      color: white !important;
       text-decoration: none;
       padding: 14px 32px;
       font-weight: 700;
       font-size: 15px;
       border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0, 212, 170, 0.2);
+      box-shadow: 0 4px 15px rgba(255, 74, 74, 0.3);
       transition: opacity 0.2s ease;
     }
-    /* Info / Privacy Box */
+    /* Info Box */
     .info-box {
-      background: rgba(0,212,170,0.06);
-      border: 1px solid rgba(0,212,170,0.15);
+      background: rgba(255, 152, 0, 0.06);
+      border: 1px solid rgba(255, 152, 0, 0.2);
       border-radius: 8px;
       padding: 14px 16px;
       margin-bottom: 24px;
@@ -90,7 +135,7 @@
       color: #8892b0;
       line-height: 1.6;
     }
-    .info-box strong { color: #00d4aa; }
+    .info-box strong { color: #ff9800; }
     /* Steps */
     .steps { margin-bottom: 24px; }
     .steps-title {
@@ -109,15 +154,15 @@
     }
     .step-num {
       width: 22px; height: 22px;
-      background: rgba(0,212,170,0.15);
-      border: 1px solid rgba(0,212,170,0.3);
+      background: rgba(255, 74, 74, 0.15);
+      border: 1px solid rgba(255, 74, 74, 0.3);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 11px;
       font-weight: 700;
-      color: #00d4aa;
+      color: #ff4b4b;
       flex-shrink: 0;
       margin-top: 1px;
     }
@@ -152,37 +197,48 @@
       <div class="body">
         <p class="greeting">Bonjour {{pseudo}} 👋</p>
         <p class="message">
-          Pour garantir l'efficacité de l'entraide sur <strong>AlertProche</strong>, la précision des alertes de proximité est essentielle.<br><br>
-          Nous vous invitons à prendre quelques secondes pour vérifier et mettre à jour votre localisation actuelle afin de continuer à recevoir les signalements pertinents autour de vous.
+          Une alerte critique vient d'être signalée sur la plateforme à proximité de votre zone de vigilance. La communauté a besoin de l'attention de chacun.
         </p>
+
+        <!-- Détails du cas -->
+        <div class="case-box">
+          <span class="alert-badge">⚠️ {{case_type}}</span>
+          <div class="case-title">{{case_title}}</div>
+          <div class="case-field">📍 <strong>Lieu :</strong> {{case_location}}</div>
+          <div class="case-field">📅 <strong>Date du signalement :</strong> {{case_date}}</div>
+          <div class="case-description">
+            <strong>Description :</strong><br>
+            {{case_description}}
+          </div>
+        </div>
 
         <!-- CTA Button -->
         <div class="cta-container">
-          <a href="{{update_location_url}}" class="cta-button">📍 Mettre à jour ma localisation</a>
+          <a href="{{case_url}}" class="cta-button">🚨 Consulter le signalement</a>
         </div>
 
-        <!-- Étapes -->
+        <!-- Étapes de vigilance civique -->
         <div class="steps">
-          <div class="steps-title">Comment faire la mise à jour</div>
+          <div class="steps-title">Comment vous pouvez agir</div>
           <div class="step">
             <div class="step-num">1</div>
-            <div class="step-text">Cliquez sur le bouton ci-dessus pour accéder directement à vos paramètres.</div>
+            <div class="step-text">Prenez connaissance des détails et des photos éventuelles sur l'application.</div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
-            <div class="step-text">Activez la localisation ou renseignez votre zone principale de vigilance.</div>
+            <div class="step-text">Restez vigilant si vous vous déplacez ou résidez dans le secteur concerné.</div>
           </div>
           <div class="step">
             <div class="step-num">3</div>
-            <div class="step-text">Validez pour mettre instantanément à jour votre rayon d'action.</div>
+            <div class="step-text">Si vous détenez la moindre information utile, apportez votre témoignage via le bouton d'aide sur le cas.</div>
           </div>
         </div>
 
-        <!-- Réassurance Confidentialité -->
+        <!-- Consignes de Sécurité -->
         <div class="info-box">
           <p>
-            <strong>🔒 Respect de votre vie privée.</strong><br>
-            AlertProche ne partage jamais vos données géographiques précises avec des tiers ou publiquement. Elles servent uniquement à filtrer les alertes d'entraide et les signalements d'objets perdus à proximité directe de chez vous.
+            <strong>⚠️ Consigne de sécurité importante.</strong><br>
+            Ne vous mettez jamais en danger pour collecter des informations. S'il s'agit d'une situation d'urgence immédiate ou d'un flagrant délit, contactez prioritairement les autorités officielles (Police, Gendarmerie ou Sapeurs-Pompiers).
           </p>
         </div>
       </div>
@@ -190,9 +246,8 @@
       <!-- Footer -->
       <div class="footer">
         <p>
-          Cet email a été envoyé à <strong>{{email}}</strong> car vous êtes membre de la communauté AlertProche.<br>
+          Cet email d'alerte automatisé a été envoyé à <strong>{{email}}</strong> selon vos préférences géographiques d'entraide.<br>
           © 2026 AlertProche — TNIC — Plateforme Citoyenne de Protection des Personnes Vulnérables.<br>
-          {{!-- <a href="{{unsubscribe_url}}">Se désabonner des alertes globales</a> --}}
         </p>
       </div>
 

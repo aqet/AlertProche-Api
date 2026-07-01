@@ -11,6 +11,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
 import { AiService } from 'src/ai/ai.service';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class PostsService {
@@ -19,6 +20,7 @@ export class PostsService {
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
+    private mailService: MailService
   ) {}
 
   async findAll(filters?: { type?: string; location?: string }) {
@@ -117,6 +119,10 @@ export class PostsService {
           imageEmbedding: imageEmbedding,
           isActive: true,
         });
+
+        if (dto.type == "Disparition" || dto.type == "Abus") {
+          this.mailService.sendMailByLocation(post)
+        }
 
         return this.enrichPost(post.toObject(), user);
       }
