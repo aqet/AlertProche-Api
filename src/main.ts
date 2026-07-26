@@ -9,9 +9,9 @@ import { json, urlencoded } from 'express';
 // Origines autorisées — frontend déployé + développement local
 const ALLOWED_ORIGINS = [
   'https://alert-proche.vercel.app',   // Frontend Vercel (production)
-  // 'http://localhost:4200',
-  'https://hp3v5282-4200.usw3.devtunnels.ms/'        ,      // Développement local Angular
-  'http://localhost:3000',   
+  'http://localhost:4200',
+  // 'https://hp3v5282-4200.usw3.devtunnels.ms/'        ,      // Développement local Angular
+  // 'http://localhost:3000',   
             // Développement local NestJS
 ];
 
