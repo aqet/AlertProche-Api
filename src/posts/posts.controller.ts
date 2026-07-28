@@ -62,6 +62,16 @@ export class PostsController {
     return this.postsService.findMyPosts(req.user._id.toString());
   }
 
+  @Post('app-download')
+  async incrementAppDownload() {
+    return this.postsService.incrementAppDownload();
+  }
+
+  @Get('app-download')
+  async getAppDownloadCount() {
+    return this.postsService.getAppDownloadCount();
+  }
+
   @Get('reported')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Moderateur', 'Admin')
