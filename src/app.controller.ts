@@ -11,7 +11,7 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get('.well-known/assetlinks.json')
+  @Get('/.well-known/assetlinks.json')
   getAssetLinks(@Res() res: Response) {
     res.setHeader('Content-Type', 'application/json');
     res.json([
