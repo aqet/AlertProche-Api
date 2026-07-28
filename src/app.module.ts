@@ -10,6 +10,8 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { ShareModule } from './share/share.module';
 import { AiModule } from './ai/ai.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -40,5 +42,7 @@ import { TrackingModule } from './tracking/tracking.module';
     AiModule,
     TrackingModule,
   ],
+  controllers: [AppController],
+  providers: [AppService]
 })
 export class AppModule {}
