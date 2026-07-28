@@ -12,12 +12,14 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
 import { AiService } from 'src/ai/ai.service';
 import { MailService } from 'src/mail/mail.service';
+import { AppDownload, AppDownloadDocument } from '../schemas/app-download.schema';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
+    @InjectModel(AppDownload.name) private appDownloadModel: Model<AppDownloadDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
     private mailService: MailService
@@ -60,6 +62,22 @@ export class PostsService {
       .sort({ createdAt: -1 })
       .lean();
     return Promise.all(posts.map((p) => this.enrichPost(p)));
+  }
+
+  async incrementAppDownload() {
+    const key = 'android-app';
+    const record = await this.appDownloadModel.findOneAndUpdate(
+      { key },
+      { $setOnInsert: { key }, $inc: { count: 1 } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    return { key, count: record.count };
+  }
+
+  async getAppDownloadCount() {
+    const record = await this.appDownloadModel.findOne({ key: 'android-app' }).lean();
+    return { key: 'android-app', count: record?.count ?? 0 };
   }
 
   async searchSimilarImages(fileBuffer: Buffer, mimeType: string) {
