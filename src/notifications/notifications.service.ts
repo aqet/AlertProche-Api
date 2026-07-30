@@ -12,7 +12,7 @@ export class NotificationsService implements OnModuleInit {
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
   ) {}
-
+ 
   onModuleInit() {
     // ⚠️ Remplace ce chemin par le chemin réel vers ton fichier JSON téléchargé depuis Firebase
     // if (process.env.FIREBASE_PRIVATE_KEY) {
