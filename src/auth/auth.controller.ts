@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { IsEmail, IsString, MinLength, MaxLength, Length } from 'class-validator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -27,6 +27,11 @@ class VerifyOtpDto {
 class RegisterWithTokenDto extends RegisterDto {
   @IsString()
   verifyToken: string;
+}
+
+class SaveTokenDto {
+  @IsString()
+  token: string;
 }
 
 class UpdateAccoumtDto {
@@ -80,11 +85,17 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('fcm-token')
-  async addToken(@Req() req, @Body('token') token: string) {
-    // req.user est généralement populé par Passport/ton JwtGuard
-    const userId = req.user.id; 
-    
-    await this.authService.registerFcmToken(userId, token);
-    return { message: 'Token enregistré avec succès' };
+  async addToken(@Req() req, @Body() dto: SaveTokenDto) {
+    const userId = req.user?._id?.toString?.();
+    if (!userId) {
+      throw new UnauthorizedException('Utilisateur non authentifié.');
+    }
+
+    const user = await this.authService.registerFcmToken(userId, dto.token);
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable pour enregistrement du token.');
+    }
+
+    return { message: 'Token enregistré avec succès', token: user.token };
   }
 }
