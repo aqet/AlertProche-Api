@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as admin from 'firebase-admin';
 import { Post, PostDocument } from '../schemas/post.schema';
 import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -12,18 +14,27 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
 import { AiService } from 'src/ai/ai.service';
 import { MailService } from 'src/mail/mail.service';
-import { AppDownload, AppDownloadDocument } from '../schemas/app-download.schema';
+import {
+  AppDownload,
+  AppDownloadDocument,
+} from '../schemas/app-download.schema';
+import { User, UserDocument } from 'src/schemas/user.schema';
+import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
-    @InjectModel(AppDownload.name) private appDownloadModel: Model<AppDownloadDocument>,
+    @InjectModel(AppDownload.name)
+    private appDownloadModel: Model<AppDownloadDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
-    private mailService: MailService
+    private mailService: MailService,
   ) {}
+
+  private readonly logger = new Logger(PostsService.name);
 
   async findAll(filters?: { type?: string; location?: string }) {
     const query: any = {};
@@ -76,7 +87,9 @@ export class PostsService {
   }
 
   async getAppDownloadCount() {
-    const record = await this.appDownloadModel.findOne({ key: 'android-app' }).lean();
+    const record = await this.appDownloadModel
+      .findOne({ key: 'android-app' })
+      .lean();
     return { key: 'android-app', count: record?.count ?? 0 };
   }
 
@@ -85,7 +98,10 @@ export class PostsService {
     const base64Image = fileBuffer.toString('base64');
 
     // 2️⃣ Appel à Gemini pour générer l'Embedding (la signature mathématique)
-    const response = await this.aiService.generateImageEmbedding(base64Image, mimeType);
+    const response = await this.aiService.generateImageEmbedding(
+      base64Image,
+      mimeType,
+    );
 
     const targetEmbedding = response; // Notre tableau de 1408 nombres
 
@@ -93,37 +109,51 @@ export class PostsService {
     return this.postModel.aggregate([
       {
         $vectorSearch: {
-          index: 'vector_index_alertProche',          // Le nom de ton index sur Atlas
-          path: 'imageEmbedding',         // Le champ dans ton schéma MongoDB
-          queryVector: targetEmbedding,   // Les 1408 nombres de l'image recherchée
-          numCandidates: 100,             // Analyse les 100 documents les plus proches
-          limit: 5                        // Renvoie le top 5 des meilleurs résultats
-        }
+          index: 'vector_index_alertProche', // Le nom de ton index sur Atlas
+          path: 'imageEmbedding', // Le champ dans ton schéma MongoDB
+          queryVector: targetEmbedding, // Les 1408 nombres de l'image recherchée
+          numCandidates: 100, // Analyse les 100 documents les plus proches
+          limit: 5, // Renvoie le top 5 des meilleurs résultats
+        },
       },
       {
         $project: {
           title: 1,
           imageUrl: 1,
           location: 1,
-          score: { $meta: 'vectorSearchScore' } // Donne la jauge de ressemblance (0 à 1)
-        }
-      }
+          score: { $meta: 'vectorSearchScore' }, // Donne la jauge de ressemblance (0 à 1)
+        },
+      },
     ]);
   }
 
-  async create(dto: CreatePostDto, user: any, file: Express.Multer.File, imageUrl?: string) {
+  async create(
+    dto: CreatePostDto,
+    user: any,
+    file: Express.Multer.File,
+    imageUrl?: string,
+  ) {
     // Modération
     // this.moderationService.validateOrThrow(dto.title);
     // this.moderationService.validateOrThrow(dto.content);
     const base64Image = file.buffer.toString('base64');
-    const imageEmbedding = await this.aiService.generateImageEmbedding(base64Image, file.mimetype);
+    const imageEmbedding = await this.aiService.generateImageEmbedding(
+      base64Image,
+      file.mimetype,
+    );
 
     let aiResult = this.aiService.moderateContent(dto.title);
-    if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+    if (
+      (await aiResult).decision == 'BAN' &&
+      (await aiResult).confidence >= 0.9
+    ) {
       return aiResult;
     } else {
       aiResult = this.aiService.moderateContent(dto.content);
-      if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+      if (
+        (await aiResult).decision == 'BAN' &&
+        (await aiResult).confidence >= 0.9
+      ) {
         return aiResult;
       } else {
         const post = await this.postModel.create({
@@ -138,11 +168,51 @@ export class PostsService {
           isActive: true,
         });
 
-        if (dto.type == "Disparition" || dto.type == "Abus") {
-          this.mailService.sendMailByLocation(post)
+        if (dto.type == 'Disparition' || dto.type == 'Abus') {
+          this.mailService.sendMailByLocation(post);
         }
-
+// 2. Déclencher la notification globale (en arrière-plan)
+  this.sendNewPostNotification(post.title, post._id.toString());
         return this.enrichPost(post.toObject(), user);
+      }
+    }
+  }
+
+  /**
+   * Envoie une notification à tous les utilisateurs enregistrés
+   */
+  async sendNewPostNotification(postTitle: string, postId: string) {
+    const users = await this.userModel.find({}, { token: 1 }).lean().exec();
+    const allTokens = [
+      ...new Set(users.flatMap((user) => user.token).filter(Boolean)),
+    ];
+
+    if (allTokens.length === 0) return;
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
+      const batchTokens = allTokens.slice(i, i + BATCH_SIZE);
+
+      const message: MulticastMessage = {
+        tokens: batchTokens,
+        notification: {
+          title: 'Nouveau message disponible !',
+          body: postTitle,
+        },
+        data: {
+          postId: postId.toString(),
+          type: 'NEW_POST',
+        },
+      };
+
+      try {
+        // 2. Utiliser getMessaging() directement
+        const response = await getMessaging().sendEachForMulticast(message);
+        this.logger.log(
+          `Lot envoyé : ${response.successCount} succès, ${response.failureCount} échecs.`,
+        );
+      } catch (error) {
+        this.logger.error("Erreur lors de l'envoi FCM", error);
       }
     }
   }
