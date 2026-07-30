@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req } from '@nestjs/common';
 import { IsEmail, IsString, MinLength, MaxLength, Length } from 'class-validator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -76,5 +76,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   updateAccount(@Request() req: any, @Body() body: UpdateAccoumtDto) {
     return this.authService.updateAccount(req.user._id.toString(), body.pseudo, body.location);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('fcm-token')
+  async addToken(@Req() req, @Body('token') token: string) {
+    // req.user est généralement populé par Passport/ton JwtGuard
+    const userId = req.user.id; 
+    
+    await this.authService.registerFcmToken(userId, token);
+    return { message: 'Token enregistré avec succès' };
   }
 }
