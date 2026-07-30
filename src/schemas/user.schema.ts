@@ -24,7 +24,7 @@ export class User {
 
   // Tableau pour stocker les tokens de tous les appareils de l'utilisateur
   @Prop({ type: [String], default: [] })
-  fcmTokens: string[];
+  token: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
