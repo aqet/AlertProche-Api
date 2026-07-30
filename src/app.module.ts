@@ -12,6 +12,7 @@ import { AiModule } from './ai/ai.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AppService } from './app.service';
     ShareModule,
     AiModule,
     TrackingModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService]
