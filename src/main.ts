@@ -11,9 +11,6 @@ const ALLOWED_ORIGINS = [
   'https://alert-proche.vercel.app',   // Frontend Vercel (production)
   'http://localhost:4200',
   'https://localhost'
-  // 'https://hp3v5282-4200.usw3.devtunnels.ms/'        ,      // Développement local Angular
-  // 'http://localhost:3000',   
-            // Développement local NestJS
 ];
 
 let cachedServer: any;
@@ -62,7 +59,6 @@ async function setupApp(app: NestExpressApplication) {
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
   }
 }
-
 // ── Handler Vercel (serverless) ──────────────────────────────────────────────
 export default async (req: any, res: any) => {
   if (!cachedServer) {
