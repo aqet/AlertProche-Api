@@ -9,11 +9,13 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
 import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
+import { User, UserSchema } from 'src/schemas/user.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
+      { name: User.name, schema: UserSchema },
       { name: Comment.name, schema: CommentSchema },
       { name: AppDownload.name, schema: AppDownloadSchema },
     ]),
