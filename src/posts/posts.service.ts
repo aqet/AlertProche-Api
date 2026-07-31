@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import * as admin from 'firebase-admin';
 import { Post, PostDocument } from '../schemas/post.schema';
 import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -133,14 +132,16 @@ export class PostsService {
     file: Express.Multer.File,
     imageUrl?: string,
   ) {
-    // Modération
-    // this.moderationService.validateOrThrow(dto.title);
-    // this.moderationService.validateOrThrow(dto.content);
-    const base64Image = file.buffer.toString('base64');
-    const imageEmbedding = await this.aiService.generateImageEmbedding(
-      base64Image,
-      file.mimetype,
-    );
+    // Calcul de l'embedding uniquement si une image est fournie
+    let imageEmbedding: number[] = [];
+    if (file?.buffer) {
+      try {
+        const base64Image = file.buffer.toString('base64');
+        imageEmbedding = await this.aiService.generateImageEmbedding(base64Image, file.mimetype);
+      } catch (err) {
+        this.logger.warn('Embedding image échoué, post créé sans embedding');
+      }
+    }
 
     let aiResult = this.aiService.moderateContent(dto.title);
     if (
@@ -171,50 +172,92 @@ export class PostsService {
         if (dto.type == 'Disparition' || dto.type == 'Abus') {
           this.mailService.sendMailByLocation(post);
         }
-// 2. Déclencher la notification globale (en arrière-plan)
-  this.sendNewPostNotification(post.title, post._id.toString());
+        // Notifications push en arrière-plan
+        this.sendNewPostNotification(post.title, post._id.toString()).catch(err =>
+          this.logger.error('sendNewPostNotification échoué', err)
+        );
         return this.enrichPost(post.toObject(), user);
       }
     }
   }
 
   /**
-   * Envoie une notification à tous les utilisateurs enregistrés
+   * Envoie une notification push FCM à tous les appareils enregistrés.
+   * Nettoie automatiquement les tokens invalides/expirés.
    */
   async sendNewPostNotification(postTitle: string, postId: string) {
-    const users = await this.userModel.find({}, { token: 1 }).lean().exec();
-    const allTokens = [
-      ...new Set(users.flatMap((user) => user.token).filter(Boolean)),
-    ];
+    const users = await this.userModel.find({ 'token.0': { $exists: true } }, { _id: 1, token: 1 }).lean().exec();
+    const allTokens = [...new Set(users.flatMap((user) => user.token).filter(Boolean))];
 
-    if (allTokens.length === 0) return;
+    if (allTokens.length === 0) {
+      this.logger.warn('Notification push ignorée : aucun token enregistré.');
+      return;
+    }
+
+    this.logger.log(`🔔 Envoi de notification push à ${allTokens.length} appareil(s) — post: ${postId}`);
 
     const BATCH_SIZE = 500;
+    let totalSuccess = 0;
+    let totalFailure = 0;
+    const invalidTokens: string[] = [];
+
     for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
       const batchTokens = allTokens.slice(i, i + BATCH_SIZE);
 
       const message: MulticastMessage = {
         tokens: batchTokens,
         notification: {
-          title: 'Nouveau message disponible !',
+          title: '🚨 Nouvelle alerte AlertProche',
           body: postTitle,
         },
         data: {
           postId: postId.toString(),
           type: 'NEW_POST',
         },
+        android: {
+          priority: 'high',
+          notification: { sound: 'default', channelId: 'alertproche_notifications' },
+        },
+        apns: {
+          payload: { aps: { sound: 'default', badge: 1 } },
+        },
       };
 
       try {
-        // 2. Utiliser getMessaging() directement
         const response = await getMessaging().sendEachForMulticast(message);
-        this.logger.log(
-          `Lot envoyé : ${response.successCount} succès, ${response.failureCount} échecs.`,
-        );
+        totalSuccess += response.successCount;
+        totalFailure += response.failureCount;
+
+        // Collecter les tokens invalides pour les supprimer
+        response.responses.forEach((res, idx) => {
+          if (!res.success) {
+            const code = res.error?.code;
+            if (
+              code === 'messaging/invalid-registration-token' ||
+              code === 'messaging/registration-token-not-registered'
+            ) {
+              invalidTokens.push(batchTokens[idx]);
+            }
+            this.logger.warn(`Token ${batchTokens[idx].slice(0, 20)}... échoué : ${code}`);
+          }
+        });
+
+        this.logger.log(`Lot ${Math.floor(i / BATCH_SIZE) + 1} : ${response.successCount} succès / ${response.failureCount} échecs`);
       } catch (error) {
-        this.logger.error("Erreur lors de l'envoi FCM", error);
+        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1} :`, error?.message || error);
       }
     }
+
+    // Supprimer les tokens invalides de la base
+    if (invalidTokens.length > 0) {
+      await this.userModel.updateMany(
+        { token: { $in: invalidTokens } },
+        { $pull: { token: { $in: invalidTokens } } },
+      );
+      this.logger.log(`🗑 ${invalidTokens.length} token(s) invalide(s) supprimé(s) de la base.`);
+    }
+
+    this.logger.log(`✅ Notification terminée — ${totalSuccess} succès, ${totalFailure} échecs sur ${allTokens.length} appareils.`);
   }
 
   async update(id: string, dto: UpdatePostDto, user: any) {

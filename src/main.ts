@@ -5,6 +5,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
 // Origines autorisées — frontend déployé + développement local
 const ALLOWED_ORIGINS = [
@@ -12,6 +13,23 @@ const ALLOWED_ORIGINS = [
   'http://localhost:4200',
   'https://localhost'
 ];
+
+// Initialisation Firebase Admin (une seule fois au démarrage)
+if (getApps().length === 0) {
+  try {
+    initializeApp({
+      credential: cert({
+        projectId:   process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // Les \n sont encodés en string dans .env — on les convertit
+        privateKey:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      }),
+    });
+    console.log('✅ Firebase Admin SDK initialisé avec succès');
+  } catch (err: any) {
+    console.error('❌ Erreur initialisation Firebase Admin:', err?.message || err);
+  }
+}
 
 let cachedServer: any;
 
