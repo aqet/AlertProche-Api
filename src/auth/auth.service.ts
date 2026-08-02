@@ -200,7 +200,7 @@ export class AuthService {
   async registerFcmToken(userId: string, token: string): Promise<User> {
     return this.userModel.findByIdAndUpdate(
       userId,
-      { $addToSet: { fcmTokens: token } }, // Ajoute le token s'il n'existe pas déjà
+      { $addToSet: { token } }, // Ajoute le token s'il n'existe pas déjà
       { new: true }
     ).exec();
   }
@@ -209,7 +209,7 @@ export class AuthService {
     // Utile pour la déconnexion de l'utilisateur
     return this.userModel.findByIdAndUpdate(
       userId,
-      { $pull: { fcmTokens: token } },
+      { $pull: { token } },
       { new: true }
     ).exec();
   }

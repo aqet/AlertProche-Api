@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId, Types } from 'mongoose';
@@ -16,22 +17,37 @@ import {
   AppDownload,
   AppDownloadDocument,
 } from '../schemas/app-download.schema';
+
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { User, UserDocument } from 'src/schemas/user.schema';
+import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
+// =======
+// import { User, UserDocument } from 'src/schemas/user.schema';
+// import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     @InjectModel(AppDownload.name)
     private appDownloadModel: Model<AppDownloadDocument>,
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
+// <<<<<<< HEAD
+    // @InjectModel(User.name) private userModel: Model<UserDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
     private mailService: MailService,
     private notificationsService: NotificationsService,
+// =======
+    // private moderationService: ModerationService,
+    // private aiService: AiService,
+    // private mailService: MailService,
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
   ) {}
+
+  private readonly logger = new Logger(PostsService.name);
 
   async findAll(filters?: { type?: string; location?: string }) {
     const query: any = {};
@@ -169,6 +185,7 @@ export class PostsService {
           this.mailService.sendMailByLocation(post);
         }
 
+
         const users = await this.userModel
           .find({
             'token.0': { $exists: true },
@@ -201,9 +218,95 @@ export class PostsService {
         //   },
         // ];
 
+
+        // Notifications push en arrière-plan
+        this.sendNewPostNotification(post.title, post._id.toString()).catch(err =>
+          this.logger.error('sendNewPostNotification échoué', err)
+        );
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
         return this.enrichPost(post.toObject(), user);
       }
     }
+  }
+
+  /**
+   * Envoie une notification push FCM à tous les appareils enregistrés.
+   * Nettoie automatiquement les tokens invalides/expirés.
+   */
+  async sendNewPostNotification(postTitle: string, postId: string) {
+    const users = await this.userModel.find({ 'token.0': { $exists: true } }, { _id: 1, token: 1 }).lean().exec();
+    const allTokens = [...new Set(users.flatMap((user) => user.token).filter(Boolean))];
+
+    if (allTokens.length === 0) {
+      this.logger.warn('Notification push ignorée : aucun token enregistré.');
+      return;
+    }
+
+    this.logger.log(`🔔 Envoi de notification push à ${allTokens.length} appareil(s) — post: ${postId}`);
+
+    const BATCH_SIZE = 500;
+    let totalSuccess = 0;
+    let totalFailure = 0;
+    const invalidTokens: string[] = [];
+
+    for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
+      const batchTokens = allTokens.slice(i, i + BATCH_SIZE);
+
+      const message: MulticastMessage = {
+        tokens: batchTokens,
+        notification: {
+          title: '🚨 Nouvelle alerte AlertProche',
+          body: postTitle,
+        },
+        data: {
+          postId: postId.toString(),
+          type: 'NEW_POST',
+        },
+        android: {
+          priority: 'high',
+          notification: { sound: 'default', channelId: 'alertproche_notifications' },
+        },
+        apns: {
+          payload: { aps: { sound: 'default', badge: 1 } },
+        },
+      };
+
+      try {
+        const response = await getMessaging().sendEachForMulticast(message);
+        totalSuccess += response.successCount;
+        totalFailure += response.failureCount;
+
+        // Collecter les tokens invalides pour les supprimer
+        response.responses.forEach((res, idx) => {
+          if (!res.success) {
+            const code = res.error?.code;
+            if (
+              code === 'messaging/invalid-registration-token' ||
+              code === 'messaging/registration-token-not-registered'
+            ) {
+              invalidTokens.push(batchTokens[idx]);
+            }
+            this.logger.warn(`Token ${batchTokens[idx].slice(0, 20)}... échoué : ${code}`);
+          }
+        });
+
+        this.logger.log(`Lot ${Math.floor(i / BATCH_SIZE) + 1} : ${response.successCount} succès / ${response.failureCount} échecs`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1} :`, errorMessage);
+      }
+    }
+
+    // Supprimer les tokens invalides de la base
+    if (invalidTokens.length > 0) {
+      await this.userModel.updateMany(
+        { token: { $in: invalidTokens } },
+        { $pull: { token: { $in: invalidTokens } } },
+      );
+      this.logger.log(`🗑 ${invalidTokens.length} token(s) invalide(s) supprimé(s) de la base.`);
+    }
+
+    this.logger.log(`✅ Notification terminée — ${totalSuccess} succès, ${totalFailure} échecs sur ${allTokens.length} appareils.`);
   }
 
   async update(id: string, dto: UpdatePostDto, user: any) {
