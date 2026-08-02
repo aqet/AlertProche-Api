@@ -11,6 +11,7 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema }
     ])
-  ]
+  ],
+  exports: [NotificationsService]
 })
 export class NotificationsModule {}

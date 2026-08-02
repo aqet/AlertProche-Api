@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, ObjectId, Types } from 'mongoose';
 import { Post, PostDocument } from '../schemas/post.schema';
 import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -12,17 +12,25 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
 import { AiService } from 'src/ai/ai.service';
 import { MailService } from 'src/mail/mail.service';
-import { AppDownload, AppDownloadDocument } from '../schemas/app-download.schema';
+import {
+  AppDownload,
+  AppDownloadDocument,
+} from '../schemas/app-download.schema';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { User, UserDocument } from 'src/schemas/user.schema';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
-    @InjectModel(AppDownload.name) private appDownloadModel: Model<AppDownloadDocument>,
+    @InjectModel(AppDownload.name)
+    private appDownloadModel: Model<AppDownloadDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
-    private mailService: MailService
+    private mailService: MailService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async findAll(filters?: { type?: string; location?: string }) {
@@ -76,7 +84,9 @@ export class PostsService {
   }
 
   async getAppDownloadCount() {
-    const record = await this.appDownloadModel.findOne({ key: 'android-app' }).lean();
+    const record = await this.appDownloadModel
+      .findOne({ key: 'android-app' })
+      .lean();
     return { key: 'android-app', count: record?.count ?? 0 };
   }
 
@@ -85,7 +95,10 @@ export class PostsService {
     const base64Image = fileBuffer.toString('base64');
 
     // 2️⃣ Appel à Gemini pour générer l'Embedding (la signature mathématique)
-    const response = await this.aiService.generateImageEmbedding(base64Image, mimeType);
+    const response = await this.aiService.generateImageEmbedding(
+      base64Image,
+      mimeType,
+    );
 
     const targetEmbedding = response; // Notre tableau de 1408 nombres
 
@@ -93,37 +106,51 @@ export class PostsService {
     return this.postModel.aggregate([
       {
         $vectorSearch: {
-          index: 'vector_index_alertProche',          // Le nom de ton index sur Atlas
-          path: 'imageEmbedding',         // Le champ dans ton schéma MongoDB
-          queryVector: targetEmbedding,   // Les 1408 nombres de l'image recherchée
-          numCandidates: 100,             // Analyse les 100 documents les plus proches
-          limit: 5                        // Renvoie le top 5 des meilleurs résultats
-        }
+          index: 'vector_index_alertProche', // Le nom de ton index sur Atlas
+          path: 'imageEmbedding', // Le champ dans ton schéma MongoDB
+          queryVector: targetEmbedding, // Les 1408 nombres de l'image recherchée
+          numCandidates: 100, // Analyse les 100 documents les plus proches
+          limit: 5, // Renvoie le top 5 des meilleurs résultats
+        },
       },
       {
         $project: {
           title: 1,
           imageUrl: 1,
           location: 1,
-          score: { $meta: 'vectorSearchScore' } // Donne la jauge de ressemblance (0 à 1)
-        }
-      }
+          score: { $meta: 'vectorSearchScore' }, // Donne la jauge de ressemblance (0 à 1)
+        },
+      },
     ]);
   }
 
-  async create(dto: CreatePostDto, user: any, file: Express.Multer.File, imageUrl?: string) {
+  async create(
+    dto: CreatePostDto,
+    user: any,
+    file: Express.Multer.File,
+    imageUrl?: string,
+  ) {
     // Modération
     // this.moderationService.validateOrThrow(dto.title);
     // this.moderationService.validateOrThrow(dto.content);
     const base64Image = file.buffer.toString('base64');
-    const imageEmbedding = await this.aiService.generateImageEmbedding(base64Image, file.mimetype);
+    const imageEmbedding = await this.aiService.generateImageEmbedding(
+      base64Image,
+      file.mimetype,
+    );
 
     let aiResult = this.aiService.moderateContent(dto.title);
-    if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+    if (
+      (await aiResult).decision == 'BAN' &&
+      (await aiResult).confidence >= 0.9
+    ) {
       return aiResult;
     } else {
       aiResult = this.aiService.moderateContent(dto.content);
-      if ((await aiResult).decision == 'BAN' && (await aiResult).confidence >= 0.9) {
+      if (
+        (await aiResult).decision == 'BAN' &&
+        (await aiResult).confidence >= 0.9
+      ) {
         return aiResult;
       } else {
         const post = await this.postModel.create({
@@ -138,9 +165,41 @@ export class PostsService {
           isActive: true,
         });
 
-        if (dto.type == "Disparition" || dto.type == "Abus") {
-          this.mailService.sendMailByLocation(post)
+        if (dto.type == 'Disparition' || dto.type == 'Abus') {
+          this.mailService.sendMailByLocation(post);
         }
+
+        const users = await this.userModel
+          .find({
+            'token.0': { $exists: true },
+          })
+          .select('token') // Récupère uniquement le champ token
+          .lean();
+
+        users.map((user) => {
+          user.token.map((token) => {
+            this.notificationsService.envoyerNotification(
+              token,
+              'Alert!!',
+              `Nouvelle ${dto.type} a ${dto.location}`,
+            );
+          });
+        });
+        console.log('users:', users);
+        // users: [
+        //   {
+        //     _id: new ObjectId('6a1d6380f2efff3c892e6caf'),
+        //     token: [
+        //       'fC_Y-Id5TM6DMANIgr7OC1:APA91bFO_eebwnZivI7sd7EJ-gb_5h0AuTD2SfWYjpF74vj7suSagjcdqWVtOSjtalW2yHBGLEMmnsMxGgnOVTwMJCUxQpmDWS-ivLERzS3XkpmXSY8Ei1s',
+        //     ],
+        //   },
+        //   {
+        //     _id: new ObjectId('6a1d63abf2efff3c892e6cbf'),
+        //     token: [
+        //       'feIqXwM2S2WVt9XcDIejJj:APA91bHTirhkAmhVkxRUZwakg83T2Do0jxFvlrQ6pEcwAgLFXtNTP-TkD9CsygWQeVKsHHuwWZ5hZjJMvs4FaRDXXVIFXQ57I6YVnx07FOD5ABMo_5B_PO0',
+        //     ],
+        //   },
+        // ];
 
         return this.enrichPost(post.toObject(), user);
       }

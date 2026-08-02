@@ -9,6 +9,8 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
 import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
+import { NotificationsModule } from 'src/notifications/notifications.module';
+import { User, UserSchema } from 'src/schemas/user.schema';
 
 @Module({
   imports: [
@@ -16,11 +18,13 @@ import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
       { name: Post.name, schema: PostSchema },
       { name: Comment.name, schema: CommentSchema },
       { name: AppDownload.name, schema: AppDownloadSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     ModerationModule,
     CloudinaryModule,
     AiModule,
-    MailModule
+    MailModule,
+    NotificationsModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],

@@ -21,7 +21,7 @@ export class NotificationsService implements OnModuleInit {
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           // Remplacement des sauts de ligne pour la clé privée
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), 
+          privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined, 
         }),
       });
   }
@@ -48,6 +48,33 @@ export class NotificationsService implements OnModuleInit {
         body: message,
       },
       token: tokenClient,
+
+      // token: tokenClient, // ou dans un objet MulticastMessage
+      // notification: {
+      //   title: title,
+      //   body: Body,
+      // },
+      // // 👈 Configuration spécifique Android pour forcer la bannière (Heads-Up)
+      // android: {
+      //   priority: 'high' as const, // Priorité maximale pour le réseau FCM
+      //   notification: {
+      //     channelId: 'alertes_importantes', // Doit correspondre au canal créé sur le mobile
+      //     sound: 'default',
+      //     priority: 'max' as const, // Affiche la bannière flottante
+      //     visibility: 'public' as const,
+      //   },
+      // },
+      // 👈 Configuration iOS
+      // apns: {
+      //   payload: {
+      //     aps: {
+      //       sound: 'default',
+      //     },
+      //   },
+      //   headers: {
+      //     'apns-priority': '10',
+      //   },
+      // },
     };
 
     try {
