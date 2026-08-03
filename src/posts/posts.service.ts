@@ -18,7 +18,7 @@ import {
   AppDownloadDocument,
 } from '../schemas/app-download.schema';
 
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { User, UserDocument } from 'src/schemas/user.schema';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
 // =======

@@ -10,7 +10,7 @@ import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
 
-import { NotificationsModule } from 'src/notifications/notifications.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 //  d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 import { User, UserSchema } from 'src/schemas/user.schema';
