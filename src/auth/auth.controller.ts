@@ -13,7 +13,7 @@ class SendOtpDto {
   @MinLength(3)
   @MaxLength(30)
   pseudo: string;
-}
+} 
 
 class VerifyOtpDto {
   @IsEmail()
