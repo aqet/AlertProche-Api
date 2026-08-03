@@ -4,7 +4,7 @@ import * as admin from 'firebase-admin';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { Model } from 'mongoose';
-import { Notification , NotificationDocument } from 'src/schemas/notification.schema';
+import { Notification , NotificationDocument } from '../schemas/notification.schema';
 
 @Injectable()
 export class NotificationsService {
