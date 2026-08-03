@@ -17,7 +17,7 @@ import { User, UserSchema } from 'src/schemas/user.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
+    MongooseModule.forFeature([ 
       { name: Post.name, schema: PostSchema },
       { name: User.name, schema: UserSchema },
       { name: Comment.name, schema: CommentSchema },
