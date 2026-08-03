@@ -7,24 +7,24 @@ import { Model } from 'mongoose';
 import { Notification , NotificationDocument } from 'src/schemas/notification.schema';
 
 @Injectable()
-export class NotificationsService implements OnModuleInit {
+export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
   ) {}
 
-  onModuleInit() {
-    // ⚠️ Remplace ce chemin par le chemin réel vers ton fichier JSON téléchargé depuis Firebase
-    // if (process.env.FIREBASE_PRIVATE_KEY) {
-      initializeApp({
-        credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          // Remplacement des sauts de ligne pour la clé privée
-          privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined, 
-        }),
-      });
-  }
+  // onModuleInit() {
+  //   // ⚠️ Remplace ce chemin par le chemin réel vers ton fichier JSON téléchargé depuis Firebase
+  //   // if (process.env.FIREBASE_PRIVATE_KEY) {
+  //     initializeApp({
+  //       credential: cert({
+  //         projectId: process.env.FIREBASE_PROJECT_ID,
+  //         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  //         // Remplacement des sauts de ligne pour la clé privée
+  //         privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined, 
+  //       }),
+  //     });
+  // }
 
   async sauvegarderToken(userId: string, token: string) {
     // TODO: Utiliser Mongoose/MongoDB pour sauvegarder ce token
