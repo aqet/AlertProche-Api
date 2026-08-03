@@ -9,6 +9,10 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
 import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
+
+import { NotificationsModule } from 'src/notifications/notifications.module';
+
+//  d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 import { User, UserSchema } from 'src/schemas/user.schema';
 
 @Module({
@@ -18,11 +22,13 @@ import { User, UserSchema } from 'src/schemas/user.schema';
       { name: User.name, schema: UserSchema },
       { name: Comment.name, schema: CommentSchema },
       { name: AppDownload.name, schema: AppDownloadSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     ModerationModule,
     CloudinaryModule,
     AiModule,
-    MailModule
+    MailModule,
+    NotificationsModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],

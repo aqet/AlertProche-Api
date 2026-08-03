@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, ObjectId, Types } from 'mongoose';
 import { Post, PostDocument } from '../schemas/post.schema';
 import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -17,8 +17,14 @@ import {
   AppDownload,
   AppDownloadDocument,
 } from '../schemas/app-download.schema';
+
+import { NotificationsService } from 'src/notifications/notifications.service';
 import { User, UserDocument } from 'src/schemas/user.schema';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
+// =======
+// import { User, UserDocument } from 'src/schemas/user.schema';
+// import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 
 @Injectable()
 export class PostsService {
@@ -28,9 +34,17 @@ export class PostsService {
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     @InjectModel(AppDownload.name)
     private appDownloadModel: Model<AppDownloadDocument>,
+// <<<<<<< HEAD
+    // @InjectModel(User.name) private userModel: Model<UserDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
     private mailService: MailService,
+    private notificationsService: NotificationsService,
+// =======
+    // private moderationService: ModerationService,
+    // private aiService: AiService,
+    // private mailService: MailService,
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
   ) {}
 
   private readonly logger = new Logger(PostsService.name);
@@ -132,16 +146,14 @@ export class PostsService {
     file: Express.Multer.File,
     imageUrl?: string,
   ) {
-    // Calcul de l'embedding uniquement si une image est fournie
-    let imageEmbedding: number[] = [];
-    if (file?.buffer) {
-      try {
-        const base64Image = file.buffer.toString('base64');
-        imageEmbedding = await this.aiService.generateImageEmbedding(base64Image, file.mimetype);
-      } catch (err) {
-        this.logger.warn('Embedding image échoué, post créé sans embedding');
-      }
-    }
+    // Modération
+    // this.moderationService.validateOrThrow(dto.title);
+    // this.moderationService.validateOrThrow(dto.content);
+    const base64Image = file.buffer.toString('base64');
+    const imageEmbedding = await this.aiService.generateImageEmbedding(
+      base64Image,
+      file.mimetype,
+    );
 
     let aiResult = this.aiService.moderateContent(dto.title);
     if (
@@ -172,10 +184,46 @@ export class PostsService {
         if (dto.type == 'Disparition' || dto.type == 'Abus') {
           this.mailService.sendMailByLocation(post);
         }
+
+
+        const users = await this.userModel
+          .find({
+            'token.0': { $exists: true },
+          })
+          .select('token') // Récupère uniquement le champ token
+          .lean();
+
+        users.map((user) => {
+          user.token.map((token) => {
+            this.notificationsService.envoyerNotification(
+              token,
+              'Alert!!',
+              `Nouvelle ${dto.type} a ${dto.location}`,
+            );
+          });
+        });
+        console.log('users:', users);
+        // users: [
+        //   {
+        //     _id: new ObjectId('6a1d6380f2efff3c892e6caf'),
+        //     token: [
+        //       'fC_Y-Id5TM6DMANIgr7OC1:APA91bFO_eebwnZivI7sd7EJ-gb_5h0AuTD2SfWYjpF74vj7suSagjcdqWVtOSjtalW2yHBGLEMmnsMxGgnOVTwMJCUxQpmDWS-ivLERzS3XkpmXSY8Ei1s',
+        //     ],
+        //   },
+        //   {
+        //     _id: new ObjectId('6a1d63abf2efff3c892e6cbf'),
+        //     token: [
+        //       'feIqXwM2S2WVt9XcDIejJj:APA91bHTirhkAmhVkxRUZwakg83T2Do0jxFvlrQ6pEcwAgLFXtNTP-TkD9CsygWQeVKsHHuwWZ5hZjJMvs4FaRDXXVIFXQ57I6YVnx07FOD5ABMo_5B_PO0',
+        //     ],
+        //   },
+        // ];
+
+
         // Notifications push en arrière-plan
         this.sendNewPostNotification(post.title, post._id.toString()).catch(err =>
           this.logger.error('sendNewPostNotification échoué', err)
         );
+// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
         return this.enrichPost(post.toObject(), user);
       }
     }
@@ -244,7 +292,8 @@ export class PostsService {
 
         this.logger.log(`Lot ${Math.floor(i / BATCH_SIZE) + 1} : ${response.successCount} succès / ${response.failureCount} échecs`);
       } catch (error) {
-        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1} :`, error?.message || error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1} :`, errorMessage);
       }
     }
 
