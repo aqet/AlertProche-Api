@@ -43,38 +43,38 @@ export class NotificationsService {
     message: string,
   ) {
     const payload = {
+      token: tokenClient,
       notification: {
         title: titre,
         body: message,
       },
-      token: tokenClient,
-
-      // token: tokenClient, // ou dans un objet MulticastMessage
-      // notification: {
-      //   title: title,
-      //   body: Body,
-      // },
-      // // 👈 Configuration spécifique Android pour forcer la bannière (Heads-Up)
-      // android: {
-      //   priority: 'high' as const, // Priorité maximale pour le réseau FCM
-      //   notification: {
-      //     channelId: 'alertes_importantes', // Doit correspondre au canal créé sur le mobile
-      //     sound: 'default',
-      //     priority: 'max' as const, // Affiche la bannière flottante
-      //     visibility: 'public' as const,
-      //   },
-      // },
-      // 👈 Configuration iOS
-      // apns: {
-      //   payload: {
-      //     aps: {
-      //       sound: 'default',
-      //     },
-      //   },
-      //   headers: {
-      //     'apns-priority': '10',
-      //   },
-      // },
+      // Configuration Android : force l'affichage en bannière plein écran
+      android: {
+        priority: 'high' as const,
+        notification: {
+          channelId: 'alertproche_notifications', // Doit correspondre au canal créé dans l'app mobile
+          sound: 'default',
+          priority: 'max' as const,       // Bannière Heads-Up visible même en veille
+          visibility: 'public' as const,  // Visible sur l'écran verrouillé
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          notificationCount: 1,
+        },
+      },
+      // Configuration iOS
+      apns: {
+        headers: {
+          'apns-priority': '10',            // Priorité maximale sur iOS
+          'apns-push-type': 'alert',
+        },
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            'content-available': 1,
+          },
+        },
+      },
     };
 
     try {

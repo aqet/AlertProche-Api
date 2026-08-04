@@ -262,12 +262,31 @@ export class PostsService {
           postId: postId.toString(),
           type: 'NEW_POST',
         },
+        // Force l'affichage en bannière plein écran sur Android
         android: {
           priority: 'high',
-          notification: { sound: 'default', channelId: 'alertproche_notifications' },
+          notification: {
+            channelId: 'alertproche_notifications', // Canal créé dans l'app mobile avec IMPORTANCE_HIGH
+            sound: 'default',
+            priority: 'max',              // Bannière Heads-Up visible même en veille
+            visibility: 'public',         // Visible sur l'écran verrouillé
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          },
         },
+        // iOS
         apns: {
-          payload: { aps: { sound: 'default', badge: 1 } },
+          headers: {
+            'apns-priority': '10',
+            'apns-push-type': 'alert',
+          },
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+              'content-available': 1,
+            },
+          },
         },
       };
 
