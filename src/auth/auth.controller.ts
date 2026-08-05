@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req, Query, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { IsEmail, IsString, MinLength, MaxLength, Length } from 'class-validator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -97,5 +97,13 @@ export class AuthController {
     }
 
     return { message: 'Token enregistré avec succès', token: user.token };
+  }
+
+  /** GET /auth/users/search?q=pseudo — Rechercher des utilisateurs par pseudo */
+  @Get('users/search')
+  @UseGuards(JwtAuthGuard)
+  searchUsers(@Query('q') q: string, @Req() req: any) {
+    if (!q || q.trim().length < 2) return [];
+    return this.authService.searchUsers(q.trim(), req.user._id.toString());
   }
 }

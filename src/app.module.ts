@@ -9,6 +9,7 @@ import { AdminModule } from './admin/admin.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ShareModule } from './share/share.module';
 import { AiModule } from './ai/ai.module';
+import { SosModule } from './sos/sos.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -41,6 +42,7 @@ import { AppService } from './app.service';
     ShareModule,
     AiModule,
     TrackingModule,
+    SosModule,
   ],
   controllers: [AppController],
   providers: [AppService]

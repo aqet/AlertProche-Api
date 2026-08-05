@@ -200,17 +200,28 @@ export class AuthService {
   async registerFcmToken(userId: string, token: string): Promise<User> {
     return this.userModel.findByIdAndUpdate(
       userId,
-      { $addToSet: { token } }, // Ajoute le token s'il n'existe pas déjà
+      { $addToSet: { token } },
       { new: true }
     ).exec();
   }
 
   async removeFcmToken(userId: string, token: string): Promise<User> {
-    // Utile pour la déconnexion de l'utilisateur
     return this.userModel.findByIdAndUpdate(
       userId,
       { $pull: { token } },
       { new: true }
     ).exec();
+  }
+
+  /** Rechercher des utilisateurs par pseudo (pour l'ajout de contacts de confiance) */
+  async searchUsers(query: string, excludeUserId: string): Promise<any[]> {
+    return this.userModel
+      .find({
+        pseudo: { $regex: query, $options: 'i' },
+        _id: { $ne: excludeUserId },
+      })
+      .select('_id pseudo photoUrl')
+      .limit(10)
+      .lean();
   }
 }
