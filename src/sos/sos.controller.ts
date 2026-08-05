@@ -101,9 +101,9 @@ export class SosController {
     return this.sosService.getSosStatus(req.user._id.toString(), sosId);
   }
 
-  /** GET /sos/history — Historique des SOS */
+  /** GET /sos/history — Historique complet (émis + répondu + reçu) */
   @Get('history')
   getHistory(@Req() req: any) {
-    return this.sosService.getHistory(req.user._id.toString());
+    return this.sosService.getFullHistory(req.user._id.toString());
   }
 }

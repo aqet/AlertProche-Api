@@ -228,7 +228,80 @@ export class SosService {
     };
   }
 
-  // ── HISTORIQUE SOS D'UN UTILISATEUR ───────────────────────────────────
+  // ── HISTORIQUE SOS COMPLET — 3 catégories ────────────────────────────
+  async getFullHistory(userId: string): Promise<any> {
+    const uid = new Types.ObjectId(userId);
+
+    // 1. SOS émis par cet utilisateur
+    const emitted = await this.sosModel
+      .find({ userId: uid })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    // 2. SOS auxquels l'utilisateur a répondu ("J'arrive")
+    const responded = await this.sosModel
+      .find({
+        respondingContacts: uid,
+        userId: { $ne: uid },   // exclure ses propres SOS
+      })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    // 3. SOS reçus (notifié) mais où il n'a pas répondu (alertes de proximité ou contacts)
+    const received = await this.sosModel
+      .find({
+        notifiedContacts: uid,
+        respondingContacts: { $ne: uid },  // pas encore en route
+        userId: { $ne: uid },
+      })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    // Enrichir chaque SOS avec le profil de l'émetteur
+    const enrichSos = async (list: any[], role: string) => {
+      return Promise.all(
+        list.map(async (sos) => {
+          const emitter = await this.userModel
+            .findById(sos.userId)
+            .select('pseudo photoUrl')
+            .lean();
+          const [lng, lat] = sos.location.coordinates;
+          return {
+            _id: sos._id,
+            status: sos.status,
+            threatLevel: sos.threatLevel,
+            latitude: lat,
+            longitude: lng,
+            createdAt: sos.createdAt,
+            resolvedAt: sos.resolvedAt,
+            resolvedReason: sos.resolvedReason,
+            respondingCount: (sos.respondingContacts || []).length,
+            notifiedCount:   (sos.notifiedContacts   || []).length,
+            emitter: emitter || null,
+            role,  // 'emitted' | 'responded' | 'received'
+          };
+        }),
+      );
+    };
+
+    const [emittedEnriched, respondedEnriched, receivedEnriched] = await Promise.all([
+      enrichSos(emitted,   'emitted'),
+      enrichSos(responded, 'responded'),
+      enrichSos(received,  'received'),
+    ]);
+
+    return {
+      emitted:   emittedEnriched,
+      responded: respondedEnriched,
+      received:  receivedEnriched,
+      total: emittedEnriched.length + respondedEnriched.length + receivedEnriched.length,
+    };
+  }
+
+  // ── HISTORIQUE SOS D'UN UTILISATEUR (legacy) ──────────────────────────
   async getHistory(userId: string): Promise<SosAlertDocument[]> {
     return this.sosModel
       .find({ userId: new Types.ObjectId(userId) })
