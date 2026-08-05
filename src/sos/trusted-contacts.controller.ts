@@ -58,4 +58,10 @@ export class TrustedContactsController {
   removeContact(@Param('contactId') contactId: string, @Req() req: any) {
     return this.trustedService.removeContact(req.user._id.toString(), contactId);
   }
+
+  /** GET /users/trusted-contacts/trusted-by-me — Qui m'a ajouté comme contact de confiance */
+  @Get('trusted-by-me')
+  getWhoTrustedMe(@Req() req: any) {
+    return this.trustedService.getWhoTrustedMe(req.user._id.toString());
+  }
 }
