@@ -125,6 +125,23 @@ export class TrustedContactsService {
     });
   }
 
+  /** Utilisateurs qui m'ont ajouté comme personne de confiance (ACCEPTED) */
+  async getWhoTrustedMe(userId: string) {
+    const users = await this.userModel
+      .find({
+        'trustedContacts.userId': new Types.ObjectId(userId),
+        'trustedContacts.status': 'ACCEPTED',
+      })
+      .select('_id pseudo photoUrl')
+      .lean();
+
+    return users.map((u) => ({
+      userId: u._id,
+      pseudo: u.pseudo,
+      photoUrl: (u as any).photoUrl || null,
+    }));
+  }
+
   // ── Notifications ──────────────────────────────────────────────────────
 
   private async sendInvitationNotification(inviterPseudo: string, contact: any) {
