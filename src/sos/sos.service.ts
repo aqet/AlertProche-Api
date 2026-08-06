@@ -18,7 +18,7 @@ export class SosService {
 
   constructor(
     @InjectModel(SosAlert.name) private sosModel: Model<SosAlertDocument>,
-    @InjectModel(User.name)     private userModel: Model<UserDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   // ── DÉCLENCHER UN SOS ───────────────────────────────────────────────────
@@ -30,7 +30,6 @@ export class SosService {
     threatLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
     audioUrl?: string,
   ): Promise<SosAlertDocument> {
-
     // Annuler tout SOS actif précédent de cet utilisateur
     await this.sosModel.updateMany(
       { userId: new Types.ObjectId(userId), status: 'ACTIVE' },
@@ -119,7 +118,7 @@ export class SosService {
 
     await this.sosModel.findByIdAndUpdate(sosId, {
       status: 'CANCELLED',
-      resolvedReason: reason || 'Annulé par l\'utilisateur',
+      resolvedReason: reason || "Annulé par l'utilisateur",
       resolvedAt: new Date(),
     });
 
@@ -136,7 +135,8 @@ export class SosService {
     reason?: string,
   ): Promise<{ message: string }> {
     const sos = await this.sosModel.findById(sosId);
-    if (!sos || sos.status !== 'ACTIVE') throw new NotFoundException('Alerte SOS active introuvable.');
+    if (!sos || sos.status !== 'ACTIVE')
+      throw new NotFoundException('Alerte SOS active introuvable.');
 
     // Vérifier que le demandeur est l'émetteur OU une personne de confiance acceptée
     const user = await this.userModel.findById(sos.userId).lean();
@@ -146,7 +146,9 @@ export class SosService {
     const isOwner = sos.userId.toString() === requesterId;
 
     if (!isOwner && !isTrusted) {
-      throw new ForbiddenException('Vous n\'êtes pas autorisé à clôturer cette alerte.');
+      throw new ForbiddenException(
+        "Vous n'êtes pas autorisé à clôturer cette alerte.",
+      );
     }
 
     await this.sosModel.findByIdAndUpdate(sosId, {
@@ -169,7 +171,8 @@ export class SosService {
       _id: new Types.ObjectId(sosId),
       status: 'ACTIVE',
     });
-    if (!sos) throw new NotFoundException('Alerte SOS introuvable ou déjà clôturée.');
+    if (!sos)
+      throw new NotFoundException('Alerte SOS introuvable ou déjà clôturée.');
 
     await this.sosModel.findByIdAndUpdate(sosId, {
       $addToSet: { respondingContacts: new Types.ObjectId(contactId) },
@@ -189,8 +192,9 @@ export class SosService {
 
     // Vérifier que le demandeur est l'émetteur OU une personne de confiance notifiée
     const isOwner = sos.userId.toString() === requesterId;
-    const isNotified = (sos.notifiedContacts || [])
-      .some(id => id.toString() === requesterId);
+    const isNotified = (sos.notifiedContacts || []).some(
+      (id) => id.toString() === requesterId,
+    );
 
     if (!isOwner && !isNotified) {
       throw new ForbiddenException('Accès non autorisé à cette alerte.');
@@ -203,7 +207,9 @@ export class SosService {
       .lean();
 
     // Récupérer les profils des personnes en route
-    const respondingIds = (sos.respondingContacts || []).map(id => id.toString());
+    const respondingIds = (sos.respondingContacts || []).map((id) =>
+      id.toString(),
+    );
     const respondingProfiles = await this.userModel
       .find({ _id: { $in: respondingIds } })
       .select('pseudo photoUrl')
@@ -243,7 +249,7 @@ export class SosService {
     const responded = await this.sosModel
       .find({
         respondingContacts: uid,
-        userId: { $ne: uid },   // exclure ses propres SOS
+        userId: { $ne: uid }, // exclure ses propres SOS
       })
       .sort({ createdAt: -1 })
       .limit(30)
@@ -253,7 +259,7 @@ export class SosService {
     const received = await this.sosModel
       .find({
         notifiedContacts: uid,
-        respondingContacts: { $ne: uid },  // pas encore en route
+        respondingContacts: { $ne: uid }, // pas encore en route
         userId: { $ne: uid },
       })
       .sort({ createdAt: -1 })
@@ -279,25 +285,29 @@ export class SosService {
             resolvedAt: sos.resolvedAt,
             resolvedReason: sos.resolvedReason,
             respondingCount: (sos.respondingContacts || []).length,
-            notifiedCount:   (sos.notifiedContacts   || []).length,
+            notifiedCount: (sos.notifiedContacts || []).length,
             emitter: emitter || null,
-            role,  // 'emitted' | 'responded' | 'received'
+            role, // 'emitted' | 'responded' | 'received'
           };
         }),
       );
     };
 
-    const [emittedEnriched, respondedEnriched, receivedEnriched] = await Promise.all([
-      enrichSos(emitted,   'emitted'),
-      enrichSos(responded, 'responded'),
-      enrichSos(received,  'received'),
-    ]);
+    const [emittedEnriched, respondedEnriched, receivedEnriched] =
+      await Promise.all([
+        enrichSos(emitted, 'emitted'),
+        enrichSos(responded, 'responded'),
+        enrichSos(received, 'received'),
+      ]);
 
     return {
-      emitted:   emittedEnriched,
+      emitted: emittedEnriched,
       responded: respondedEnriched,
-      received:  receivedEnriched,
-      total: emittedEnriched.length + respondedEnriched.length + receivedEnriched.length,
+      received: receivedEnriched,
+      total:
+        emittedEnriched.length +
+        respondedEnriched.length +
+        receivedEnriched.length,
     };
   }
 
@@ -312,10 +322,12 @@ export class SosService {
 
   // ── SOS ACTIF D'UN UTILISATEUR ────────────────────────────────────────
   async getActiveSos(userId: string): Promise<SosAlertDocument | null> {
-    return this.sosModel.findOne({
-      userId: new Types.ObjectId(userId),
-      status: 'ACTIVE',
-    }).lean() as any;
+    return this.sosModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        status: 'ACTIVE',
+      })
+      .lean() as any;
   }
 
   // ── AUTO-CLÔTURE APRÈS 12H (appelé par un cron job) ───────────────────
@@ -329,7 +341,7 @@ export class SosService {
     for (const sos of expired) {
       await this.sosModel.findByIdAndUpdate(sos._id, {
         status: 'RESOLVED',
-        resolvedReason: 'Auto-clôturé après 12h d\'inactivité',
+        resolvedReason: "Auto-clôturé après 12h d'inactivité",
         resolvedAt: new Date(),
       });
       this.logger.warn(`SOS ${sos._id} auto-clôturé après 12h.`);
@@ -338,16 +350,20 @@ export class SosService {
 
   // ── ALERTE BATTERIE CRITIQUE ───────────────────────────────────────────
   async handleLowBattery(userId: string, sosId: string): Promise<void> {
-    const sos = await this.sosModel.findOne({
-      _id: new Types.ObjectId(sosId),
-      userId: new Types.ObjectId(userId),
-      status: 'ACTIVE',
-    }).lean();
+    const sos = await this.sosModel
+      .findOne({
+        _id: new Types.ObjectId(sosId),
+        userId: new Types.ObjectId(userId),
+        status: 'ACTIVE',
+      })
+      .lean();
     if (!sos) return;
 
     const user = await this.userModel.findById(userId).lean();
     const trustedContacts = await this.getTrustedContactUsers(user);
-    const tokens = trustedContacts.flatMap((c) => c.token || []).filter(Boolean);
+    const tokens = trustedContacts
+      .flatMap((c) => c.token || [])
+      .filter(Boolean);
 
     if (tokens.length === 0) return;
 
@@ -355,7 +371,12 @@ export class SosService {
     await this.sendFcm(tokens, {
       title: '🔴 Batterie critique — AlertProche',
       body: `La batterie de ${user.pseudo} est presque vide. Dernière position : ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      data: { sosId: sos._id.toString(), type: 'LOW_BATTERY', lat: String(lat), lng: String(lng) },
+      data: {
+        sosId: sos._id.toString(),
+        type: 'LOW_BATTERY',
+        lat: String(lat),
+        lng: String(lng),
+      },
     });
   }
 
@@ -397,7 +418,11 @@ export class SosService {
 
     // Enregistrer les contacts notifiés
     await this.sosModel.findByIdAndUpdate(sos._id, {
-      $addToSet: { notifiedContacts: { $each: contactIds.map((id) => new Types.ObjectId(id)) } },
+      $addToSet: {
+        notifiedContacts: {
+          $each: contactIds.map((id) => new Types.ObjectId(id)),
+        },
+      },
     });
   }
 
@@ -408,16 +433,18 @@ export class SosService {
     longitude: number,
   ): Promise<void> {
     // Chercher les utilisateurs dans un rayon de 1km qui ont les alertes de proximité activées
-    const nearbyUsers = await this.userModel.find({
-      _id: { $ne: new Types.ObjectId(emitter._id.toString()) },
-      disableProximityAlerts: { $ne: true },
-      lastKnownLocation: {
-        $near: {
-          $geometry: { type: 'Point', coordinates: [longitude, latitude] },
-          $maxDistance: 1000, // 1km
+    const nearbyUsers = await this.userModel
+      .find({
+        _id: { $ne: new Types.ObjectId(emitter._id.toString()) },
+        disableProximityAlerts: { $ne: true },
+        lastKnownLocation: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [longitude, latitude] },
+            $maxDistance: 1000, // 1km
+          },
         },
-      },
-    }).lean();
+      })
+      .lean();
 
     const tokens = nearbyUsers.flatMap((u) => u.token || []).filter(Boolean);
     if (tokens.length === 0) return;
@@ -443,13 +470,16 @@ export class SosService {
   ): Promise<void> {
     const emitter = await this.userModel.findById(sos.userId).lean();
     const contactIds = (sos.notifiedContacts || []).map((id) => id.toString());
-    const contacts = await this.userModel.find({ _id: { $in: contactIds } }).lean();
+    const contacts = await this.userModel
+      .find({ _id: { $in: contactIds } })
+      .lean();
     const tokens = contacts.flatMap((u) => u.token || []).filter(Boolean);
     if (tokens.length === 0) return;
 
-    const msg = status === 'RESOLVED'
-      ? `${emitter?.pseudo} est en sécurité. Alerte clôturée.`
-      : `${emitter?.pseudo} a annulé son alerte SOS.`;
+    const msg =
+      status === 'RESOLVED'
+        ? `${emitter?.pseudo} est en sécurité. Alerte clôturée.`
+        : `${emitter?.pseudo} a annulé son alerte SOS.`;
 
     await this.sendFcm(tokens, {
       title: status === 'RESOLVED' ? '✅ Alerte résolue' : '🔕 Alerte annulée',
@@ -480,25 +510,31 @@ export class SosService {
         notification: { title: payload.title, body: payload.body },
         data: payload.data || {},
         android: {
-          priority: 'high',
+          priority: 'high' as const,
           notification: {
-            channelId: 'alertproche_notifications',
-            sound: 'default',
-            priority: 'max',
-            visibility: 'public',
-            defaultSound: true,
-            defaultVibrateTimings: true,
+            channelId: 'alertproche_sos_channel', // Nouveau canal spécifique aux SOS
+            sound: 'alertsos', // Nom du fichier dans res/raw (SANS .mp3)
+            priority: 'max' as const, // Affichage Heads-Up immédiat
+            visibility: 'public' as const, // Visible sur l'écran verrouillé
+            defaultSound: false, // IMPORTANT : Désactiver le son système
+            defaultVibrateTimings: false, // Personnaliser ou laisser la vibration
+            vibrateTimingsMillis: [0, 500, 200, 500, 200, 1000], // Motifs de vibration d'urgence
+            notificationCount: 1,
           },
         },
         apns: {
           headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
-          payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } },
+          payload: {
+            aps: { sound: 'alertsos', badge: 1, 'content-available': 1 },
+          },
         },
       };
 
       try {
         const response = await getMessaging().sendEachForMulticast(message);
-        this.logger.log(`FCM SOS : ${response.successCount} succès / ${response.failureCount} échecs`);
+        this.logger.log(
+          `FCM SOS : ${response.successCount} succès / ${response.failureCount} échecs`,
+        );
       } catch (err: any) {
         this.logger.error('Erreur FCM SOS :', err?.message);
       }
