@@ -234,6 +234,14 @@ export class PostsService {
    * Nettoie automatiquement les tokens invalides/expirés.
    */
   async sendNewPostNotification(postTitle: string, postId: string) {
+    // Guard Firebase
+    try {
+      getMessaging();
+    } catch {
+      this.logger.error('Firebase Admin non initialisé — notification post ignorée.');
+      return;
+    }
+
     const users = await this.userModel.find({ 'token.0': { $exists: true } }, { _id: 1, token: 1 }).lean().exec();
     const allTokens = [...new Set(users.flatMap((user) => user.token).filter(Boolean))];
 
