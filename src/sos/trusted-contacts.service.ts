@@ -1,5 +1,8 @@
 import {
-  Injectable, NotFoundException, BadRequestException, Logger,
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -10,9 +13,7 @@ import { User, UserDocument } from '../schemas/user.schema';
 export class TrustedContactsService {
   private readonly logger = new Logger(TrustedContactsService.name);
 
-  constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-  ) {}
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   /** Récupérer mes personnes de confiance avec leur profil */
   async getMyContacts(userId: string) {
@@ -30,7 +31,8 @@ export class TrustedContactsService {
       userId: c.userId,
       status: c.status,
       addedAt: c.addedAt,
-      profile: profiles.find((p) => p._id.toString() === c.userId.toString()) || null,
+      profile:
+        profiles.find((p) => p._id.toString() === c.userId.toString()) || null,
     }));
   }
 
@@ -55,7 +57,9 @@ export class TrustedContactsService {
   /** Ajouter une personne de confiance (max 5) */
   async addContact(userId: string, contactUserId: string) {
     if (userId === contactUserId) {
-      throw new BadRequestException('Vous ne pouvez pas vous ajouter vous-même.');
+      throw new BadRequestException(
+        'Vous ne pouvez pas vous ajouter vous-même.',
+      );
     }
 
     const user = await this.userModel.findById(userId);
@@ -69,7 +73,9 @@ export class TrustedContactsService {
     // Vérifier la limite de 5
     const accepted = current.filter((c) => c.status === 'ACCEPTED');
     if (accepted.length >= 5) {
-      throw new BadRequestException('Vous avez atteint la limite de 5 personnes de confiance.');
+      throw new BadRequestException(
+        'Vous avez atteint la limite de 5 personnes de confiance.',
+      );
     }
 
     // Vérifier doublon
@@ -89,7 +95,10 @@ export class TrustedContactsService {
     // Envoyer une notification push d'invitation au contact
     await this.sendInvitationNotification(user.pseudo, contact);
 
-    return { message: 'Invitation envoyée.', contact: { userId: contactUserId, status: 'PENDING' } };
+    return {
+      message: 'Invitation envoyée.',
+      contact: { userId: contactUserId, status: 'PENDING' },
+    };
   }
 
   /** Accepter ou refuser une invitation */
@@ -114,7 +123,8 @@ export class TrustedContactsService {
     await this.sendResponseNotification(responder, inviter, action);
 
     return {
-      message: action === 'accept' ? 'Invitation acceptée.' : 'Invitation refusée.',
+      message:
+        action === 'accept' ? 'Invitation acceptée.' : 'Invitation refusée.',
     };
   }
 
@@ -123,6 +133,54 @@ export class TrustedContactsService {
     await this.userModel.findByIdAndUpdate(userId, {
       $pull: { trustedContacts: { userId: new Types.ObjectId(contactId) } },
     });
+    return { message: 'Contact retiré.' };
+  }
+
+  /**
+   * Se retirer soi-même de la liste d'un autre utilisateur.
+   * Appelé par l'utilisateur B qui veut ne plus être contact de confiance de A.
+   * ownerId = A (celui dont on veut quitter la liste)
+   * selfId  = B (l'appelant — celui qui se retire)
+   */
+  async leaveTrustedList(selfId: string, ownerId: string) {
+    const owner = await this.userModel.findById(ownerId);
+    if (!owner) throw new NotFoundException('Utilisateur introuvable.');
+
+    const entry = owner.trustedContacts?.find(
+      (c) => c.userId.toString() === selfId,
+    );
+    if (!entry) throw new NotFoundException('Vous n\'êtes pas dans la liste de cet utilisateur.');
+
+    await this.userModel.findByIdAndUpdate(ownerId, {
+      $pull: { trustedContacts: { userId: new Types.ObjectId(selfId) } },
+    });
+
+    // Notifier A que B s'est retiré
+    const self = await this.userModel.findById(selfId).select('pseudo token').lean();
+    const tokens = (owner.token || []).filter(Boolean);
+    if (tokens.length > 0 && self) {
+      try {
+        const { getMessaging } = await import('firebase-admin/messaging');
+        await getMessaging().sendEachForMulticast({
+          tokens,
+          notification: {
+            title: 'AlertProche — Contact retiré',
+            body: `${self.pseudo} ne fait plus partie de vos contacts de confiance.`,
+          },
+          data: { type: 'TRUSTED_CONTACT_LEFT', pseudo: self.pseudo },
+          android: {
+            priority: 'high',
+            notification: { channelId: 'alertproche_notifications', sound: 'default' },
+          },
+          apns: {
+            headers: { 'apns-priority': '10' },
+            payload: { aps: { sound: 'default', badge: 1 } },
+          },
+        });
+      } catch { /* Notification non bloquante */ }
+    }
+
+    return { message: `Vous avez quitté la liste de contacts de confiance de ${owner.pseudo}.` };
   }
 
   /** Utilisateurs qui m'ont ajouté comme personne de confiance (ACCEPTED) */
@@ -144,7 +202,10 @@ export class TrustedContactsService {
 
   // ── Notifications ──────────────────────────────────────────────────────
 
-  private async sendInvitationNotification(inviterPseudo: string, contact: any) {
+  private async sendInvitationNotification(
+    inviterPseudo: string,
+    contact: any,
+  ) {
     const tokens = (contact.token || []).filter(Boolean);
     if (tokens.length === 0) return;
 
@@ -158,7 +219,10 @@ export class TrustedContactsService {
         data: { type: 'TRUSTED_CONTACT_INVITE', inviterPseudo },
         android: {
           priority: 'high',
-          notification: { channelId: 'alertproche_notifications', sound: 'default' },
+          notification: {
+            channelId: 'alertproche_notifications',
+            sound: 'default',
+          },
         },
         apns: {
           headers: { 'apns-priority': '10' },
@@ -178,18 +242,29 @@ export class TrustedContactsService {
     const tokens = (inviter.token || []).filter(Boolean);
     if (tokens.length === 0) return;
 
-    const msg = action === 'accept'
-      ? `${responder.pseudo} a accepté votre invitation. ✅`
-      : `${responder.pseudo} a refusé votre invitation.`;
+    const msg =
+      action === 'accept'
+        ? `${responder.pseudo} a accepté votre invitation. ✅`
+        : `${responder.pseudo} a refusé votre invitation.`;
 
     try {
       await getMessaging().sendEachForMulticast({
         tokens,
-        notification: { title: 'AlertProche — Réponse à votre invitation', body: msg },
-        data: { type: 'TRUSTED_CONTACT_RESPONSE', action, responderPseudo: responder.pseudo },
+        notification: {
+          title: 'AlertProche — Réponse à votre invitation',
+          body: msg,
+        },
+        data: {
+          type: 'TRUSTED_CONTACT_RESPONSE',
+          action,
+          responderPseudo: responder.pseudo,
+        },
         android: {
           priority: 'high',
-          notification: { channelId: 'alertproche_notifications', sound: 'default' },
+          notification: {
+            channelId: 'alertproche_notifications',
+            sound: 'default',
+          },
         },
         apns: {
           headers: { 'apns-priority': '10' },

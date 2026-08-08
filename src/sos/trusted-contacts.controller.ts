@@ -64,4 +64,11 @@ export class TrustedContactsController {
   getWhoTrustedMe(@Req() req: any) {
     return this.trustedService.getWhoTrustedMe(req.user._id.toString());
   }
+
+  /** DELETE /users/trusted-contacts/leave/:ownerId — Se retirer de la liste de quelqu'un */
+  @Delete('leave/:ownerId')
+  @HttpCode(HttpStatus.OK)
+  leaveTrustedList(@Param('ownerId') ownerId: string, @Req() req: any) {
+    return this.trustedService.leaveTrustedList(req.user._id.toString(), ownerId);
+  }
 }

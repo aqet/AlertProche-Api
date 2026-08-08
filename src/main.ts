@@ -7,31 +7,36 @@ import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
-// Origines autorisées — frontend déployé + développement local
-const ALLOWED_ORIGINS = [
-  'https://alert-proche.vercel.app',   // Frontend Vercel (production)
-  'http://localhost:4200',
-  'https://localhost'
-];
+// ── Firebase Admin — initialisation unique et robuste ─────────────────────
+function ensureFirebaseInit() {
+  if (getApps().length > 0) return; // Déjà initialisé
 
-// Initialisation Firebase Admin (une seule fois au démarrage)
-if (getApps().length === 0) {
+  const projectId   = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey  = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
+  if (!projectId || !clientEmail || !privateKey) {
+    console.error('❌ Variables Firebase manquantes dans les env vars.');
+    return;
+  }
+
   try {
-    initializeApp({
-      credential: cert({
-        projectId:   process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // Les \n sont encodés en string dans .env — on les convertit
-        privateKey:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-      }),
-    });
-    console.log('✅ Firebase Admin SDK initialisé avec succès');
+    initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+    console.log('✅ Firebase Admin SDK initialisé');
   } catch (err: any) {
-    console.error('❌ Erreur initialisation Firebase Admin:', err?.message || err);
+    console.error('❌ Erreur Firebase Admin init:', err?.message || err);
   }
 }
 
-let cachedServer: any;
+// Appel immédiat au chargement du module
+ensureFirebaseInit();
+
+// Origines autorisées
+const ALLOWED_ORIGINS = [
+  'https://alert-proche.vercel.app',
+  'http://localhost:4200',
+  'https://localhost',
+];
 
 async function setupApp(app: NestExpressApplication) {
 
@@ -77,8 +82,11 @@ async function setupApp(app: NestExpressApplication) {
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
   }
 }
+let cachedServer: any;
+
 // ── Handler Vercel (serverless) ──────────────────────────────────────────────
 export default async (req: any, res: any) => {
+  ensureFirebaseInit(); // Réinitialise si l'instance froide ne l'a pas fait
   if (!cachedServer) {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: false });
     await setupApp(app);

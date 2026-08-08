@@ -502,6 +502,14 @@ export class SosService {
   ): Promise<void> {
     if (tokens.length === 0) return;
 
+    // Guard : Firebase doit être initialisé
+    try {
+      getMessaging(); // Lance une erreur si Firebase n'est pas init
+    } catch {
+      this.logger.error('Firebase Admin non initialisé — notifications SOS ignorées.');
+      return;
+    }
+
     const BATCH = 500;
     for (let i = 0; i < tokens.length; i += BATCH) {
       const batch = tokens.slice(i, i + BATCH);
