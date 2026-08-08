@@ -133,6 +133,54 @@ export class TrustedContactsService {
     await this.userModel.findByIdAndUpdate(userId, {
       $pull: { trustedContacts: { userId: new Types.ObjectId(contactId) } },
     });
+    return { message: 'Contact retiré.' };
+  }
+
+  /**
+   * Se retirer soi-même de la liste d'un autre utilisateur.
+   * Appelé par l'utilisateur B qui veut ne plus être contact de confiance de A.
+   * ownerId = A (celui dont on veut quitter la liste)
+   * selfId  = B (l'appelant — celui qui se retire)
+   */
+  async leaveTrustedList(selfId: string, ownerId: string) {
+    const owner = await this.userModel.findById(ownerId);
+    if (!owner) throw new NotFoundException('Utilisateur introuvable.');
+
+    const entry = owner.trustedContacts?.find(
+      (c) => c.userId.toString() === selfId,
+    );
+    if (!entry) throw new NotFoundException('Vous n\'êtes pas dans la liste de cet utilisateur.');
+
+    await this.userModel.findByIdAndUpdate(ownerId, {
+      $pull: { trustedContacts: { userId: new Types.ObjectId(selfId) } },
+    });
+
+    // Notifier A que B s'est retiré
+    const self = await this.userModel.findById(selfId).select('pseudo token').lean();
+    const tokens = (owner.token || []).filter(Boolean);
+    if (tokens.length > 0 && self) {
+      try {
+        const { getMessaging } = await import('firebase-admin/messaging');
+        await getMessaging().sendEachForMulticast({
+          tokens,
+          notification: {
+            title: 'AlertProche — Contact retiré',
+            body: `${self.pseudo} ne fait plus partie de vos contacts de confiance.`,
+          },
+          data: { type: 'TRUSTED_CONTACT_LEFT', pseudo: self.pseudo },
+          android: {
+            priority: 'high',
+            notification: { channelId: 'alertproche_notifications', sound: 'default' },
+          },
+          apns: {
+            headers: { 'apns-priority': '10' },
+            payload: { aps: { sound: 'default', badge: 1 } },
+          },
+        });
+      } catch { /* Notification non bloquante */ }
+    }
+
+    return { message: `Vous avez quitté la liste de contacts de confiance de ${owner.pseudo}.` };
   }
 
   /** Utilisateurs qui m'ont ajouté comme personne de confiance (ACCEPTED) */
