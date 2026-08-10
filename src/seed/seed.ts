@@ -1,5 +1,5 @@
 /**
- * Script de seed — peuple la base MongoDB avec des données de démo.
+ * Script de seed - peuple la base MongoDB avec des données de démo.
  * Exécuter avec : npx ts-node src/seed/seed.ts
  *
  * Prérequis MongoDB Atlas :

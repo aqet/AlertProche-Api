@@ -20,7 +20,7 @@ export class TrackingService {
   ) {}
 
   // ──────────────────────────────────────────────
-  // Tâche 4.1 — Hachage IP
+  // Tâche 4.1 - Hachage IP
   // SHA-256 puis on garde les 16 premiers chars hex :
   // suffisant pour dé-duplication sans révéler l'IP réelle.
   // ──────────────────────────────────────────────
@@ -29,7 +29,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Tâche 4.3 — Résolution géographique
+  // Tâche 4.3 - Résolution géographique
   // Les IPs privées / loopback ne sont pas dans la base GeoIP,
   // on les court-circuite directement pour éviter un lookup inutile.
   // ──────────────────────────────────────────────
@@ -61,7 +61,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Tâche 4.4 — Extraction de l'IP réelle
+  // Tâche 4.4 - Extraction de l'IP réelle
   // X-Forwarded-For peut contenir "clientIp, proxy1, proxy2" ;
   // on prend le premier élément (l'IP d'origine).
   // Le préfixe ::ffff: indique une IPv4 encapsulée en IPv6.
@@ -88,7 +88,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Persistance — Sessions
+  // Persistance - Sessions
   // ──────────────────────────────────────────────
   async persistSession(dto: CreateSessionDto, req: any): Promise<void> {
     const ip = this.extractIp(req);
@@ -113,7 +113,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Persistance — Pageviews
+  // Persistance - Pageviews
   // ──────────────────────────────────────────────
   async persistPageview(dto: CreateEventDto): Promise<void> {
     await this.eventModel.create({
@@ -129,7 +129,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Persistance — Événements métier
+  // Persistance - Événements métier
   // ──────────────────────────────────────────────
   async persistEvent(dto: CreateEventDto): Promise<void> {
     await this.eventModel.create({
@@ -145,7 +145,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Persistance — Fin de session
+  // Persistance - Fin de session
   // ──────────────────────────────────────────────
   async endSession(sessionId: string, dto: EndSessionDto): Promise<void> {
     await this.sessionModel.findOneAndUpdate(
@@ -159,7 +159,7 @@ export class TrackingService {
   }
 
   // ──────────────────────────────────────────────
-  // Analytics — helpers & endpoints
+  // Analytics - helpers & endpoints
   // ──────────────────────────────────────────────
 
   // Convertit "7d" / "30d" / "90d" en Date de début de période

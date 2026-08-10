@@ -21,7 +21,7 @@ export class User {
   @Prop({ required: true, unique: false, trim: true })
   location: string;
 
-  // Photo de profil (URL Cloudinary — utilisée dans les alertes SOS de proximité)
+  // Photo de profil (URL Cloudinary - utilisée dans les alertes SOS de proximité)
   @Prop({ type: String, default: null })
   photoUrl?: string;
 
@@ -29,11 +29,20 @@ export class User {
   @Prop({ type: String, default: null })
   sosPin?: string;
 
+  // Version de l'application mobile installée (ex: "1.0.0")
+  @Prop({ type: String, default: null })
+  appVersion?: string;
+
+  // Token FCM principal (single - différent du tableau multi-appareils `token`)
+  // ⚠️ On garde le champ `token[]` existant, on ajoute juste `lastUpdateNotificationSentAt`
+  @Prop({ type: Date, default: null })
+  lastUpdateNotificationSentAt?: Date;
+
   // Tokens FCM pour les notifications push (multi-appareils)
   @Prop({ type: [String], default: [] })
   token: string[];
 
-  // Personnes de Confiance — max 5
+  // Personnes de Confiance - max 5
   @Prop({
     type: [
       {

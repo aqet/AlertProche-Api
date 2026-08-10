@@ -34,7 +34,7 @@ export class ShareController {
       const emoji    = TYPE_EMOJI[post.type] || '📢';
 
       const title       = `${emoji} ${post.title}`;
-      const description = `${post.type} — ${post.location}\n${post.content.slice(0, 200).replace(/\n/g, ' ')}…`;
+      const description = `${post.type} - ${post.location}\n${post.content.slice(0, 200).replace(/\n/g, ' ')}…`;
       const safeTitle   = this.escape(title);
       const safeDesc    = this.escape(description);
       const safeImage   = this.escape(image);
@@ -45,7 +45,7 @@ export class ShareController {
 <html lang="fr" prefix="og: https://ogp.me/ns#">
 <head>
   <meta charset="UTF-8">
-  <title>${safeTitle} — ${SITE_NAME}</title>
+  <title>${safeTitle} - ${SITE_NAME}</title>
 
   <!-- ── Open Graph (Facebook, WhatsApp, Telegram, LinkedIn) ─── -->
   <meta property="og:type"         content="article">
@@ -88,7 +88,7 @@ export class ShareController {
 </html>`;
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      // Pas de cache long — le post peut être modifié
+      // Pas de cache long - le post peut être modifié
       res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       res.status(200).send(html);
 

@@ -140,7 +140,7 @@ export class TrustedContactsService {
    * Se retirer soi-même de la liste d'un autre utilisateur.
    * Appelé par l'utilisateur B qui veut ne plus être contact de confiance de A.
    * ownerId = A (celui dont on veut quitter la liste)
-   * selfId  = B (l'appelant — celui qui se retire)
+   * selfId  = B (l'appelant - celui qui se retire)
    */
   async leaveTrustedList(selfId: string, ownerId: string) {
     const owner = await this.userModel.findById(ownerId);
@@ -164,7 +164,7 @@ export class TrustedContactsService {
         await getMessaging().sendEachForMulticast({
           tokens,
           notification: {
-            title: 'AlertProche — Contact retiré',
+            title: 'AlertProche - Contact retiré',
             body: `${self.pseudo} ne fait plus partie de vos contacts de confiance.`,
           },
           data: { type: 'TRUSTED_CONTACT_LEFT', pseudo: self.pseudo },
@@ -251,7 +251,7 @@ export class TrustedContactsService {
       await getMessaging().sendEachForMulticast({
         tokens,
         notification: {
-          title: 'AlertProche — Réponse à votre invitation',
+          title: 'AlertProche - Réponse à votre invitation',
           body: msg,
         },
         data: {

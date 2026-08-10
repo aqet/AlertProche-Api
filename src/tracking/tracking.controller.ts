@@ -15,7 +15,7 @@ import { Roles } from '../auth/roles.decorator';
 export class TrackingController {
   constructor(private readonly trackingService: TrackingService) {}
 
-  // ── Endpoints de collecte (pas de JWT — accessibles à tous) ──────
+  // ── Endpoints de collecte (pas de JWT - accessibles à tous) ──────
 
   // Répond 202 immédiatement, persiste en arrière-plan
   @Post('session')

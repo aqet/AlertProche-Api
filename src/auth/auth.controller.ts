@@ -58,7 +58,7 @@ export class AuthController {
     return this.authService.verifyOtp(dto);
   }
 
-  // verifyToken dans le body — évite les problèmes de CORS sur les headers custom
+  // verifyToken dans le body - évite les problèmes de CORS sur les headers custom
   @Post('register')
   register(@Body() dto: RegisterWithTokenDto) {
     const { verifyToken, ...registerData } = dto;
@@ -99,7 +99,7 @@ export class AuthController {
     return { message: 'Token enregistré avec succès', token: user.token };
   }
 
-  /** GET /auth/users/search?q=pseudo — Rechercher des utilisateurs par pseudo */
+  /** GET /auth/users/search?q=pseudo - Rechercher des utilisateurs par pseudo */
   @Get('users/search')
   @UseGuards(JwtAuthGuard)
   searchUsers(@Query('q') q: string, @Req() req: any) {

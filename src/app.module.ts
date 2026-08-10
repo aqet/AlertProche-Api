@@ -11,6 +11,7 @@ import { ShareModule } from './share/share.module';
 import { AiModule } from './ai/ai.module';
 import { SosModule } from './sos/sos.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { VersionsModule } from './versions/versions.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -43,6 +44,7 @@ import { AppService } from './app.service';
     AiModule,
     TrackingModule,
     SosModule,
+    VersionsModule,
   ],
   controllers: [AppController],
   providers: [AppService]

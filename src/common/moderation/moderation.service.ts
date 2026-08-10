@@ -8,7 +8,7 @@ export interface ModerationResult {
 
 @Injectable()
 export class ModerationService {
-  // Dictionnaire lexical — termes interdits
+  // Dictionnaire lexical - termes interdits
   private readonly BANNED_WORDS = [
     'idiot', 'imbecile', 'connard', 'salaud', 'ordure', 'batard', 'putain',
     'merde', 'encule', 'fils de pute', 'negre', 'bamboula', 'macaque',
@@ -18,7 +18,7 @@ export class ModerationService {
     'abruti', 'cretin',
   ];
 
-  // Regex anti-doxxing — numéros de téléphone camerounais
+  // Regex anti-doxxing - numéros de téléphone camerounais
   // private readonly PHONE_PATTERNS = [
   //   /\b(6[5-9]\d{7})\b/,
   //   /\b(2[23]\d{7})\b/,
@@ -27,7 +27,7 @@ export class ModerationService {
   //   /\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{3,4}\b/,
   // ];
 
-  // Regex anti-doxxing — identifiants officiels
+  // Regex anti-doxxing - identifiants officiels
   private readonly ID_PATTERNS = [
     /\b[A-Z]{1,3}\d{6,10}[A-Z]?\b/,
     /passport[e]?\s*:?\s*[A-Z0-9]{6,12}/i,
@@ -49,14 +49,14 @@ export class ModerationService {
       }
     }
 
-    // 2. Filtre anti-doxxing — téléphones
+    // 2. Filtre anti-doxxing - téléphones
     // for (const pattern of this.PHONE_PATTERNS) {
     //   if (pattern.test(text)) {
     //     return { isClean: false, reason: 'phone', flaggedWord: 'numéro de téléphone' };
     //   }
     // }
 
-    // 3. Filtre anti-doxxing — identifiants
+    // 3. Filtre anti-doxxing - identifiants
     for (const pattern of this.ID_PATTERNS) {
       if (pattern.test(text)) {
         return { isClean: false, reason: 'id', flaggedWord: 'identifiant officiel' };
