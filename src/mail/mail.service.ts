@@ -37,7 +37,7 @@ export class MailService {
 
     this.transporter.verify((err) => {
       if (err) this.logger.warn(`SMTP non vérifié: ${err.message}`);
-      else this.logger.log('✅ SMTP connecté — Gmail prêt');
+      else this.logger.log('✅ SMTP connecté - Gmail prêt');
     });
   }
 
@@ -57,7 +57,7 @@ export class MailService {
 
     return this.send({
       to,
-      subject: `${code} — Votre code de vérification AlertProche`,
+      subject: `${code} - Votre code de vérification AlertProche`,
       html,
     });
   }
@@ -145,7 +145,7 @@ console.log(post);
         return this.send({
           to: user.email, // FIX: Envoi au vrai destinataire
           subject:
-            `🚨 ALERTE : ${post.type} signalé à ${post.location} — AlertProche`,
+            `🚨 ALERTE : ${post.type} signalé à ${post.location} - AlertProche`,
           html,
         });
       });

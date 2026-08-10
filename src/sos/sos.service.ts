@@ -234,7 +234,7 @@ export class SosService {
     };
   }
 
-  // ── HISTORIQUE SOS COMPLET — 3 catégories ────────────────────────────
+  // ── HISTORIQUE SOS COMPLET - 3 catégories ────────────────────────────
   async getFullHistory(userId: string): Promise<any> {
     const uid = new Types.ObjectId(userId);
 
@@ -369,7 +369,7 @@ export class SosService {
 
     const [lng, lat] = sos.location.coordinates;
     await this.sendFcm(tokens, {
-      title: '🔴 Batterie critique — AlertProche',
+      title: '🔴 Batterie critique - AlertProche',
       body: `La batterie de ${user.pseudo} est presque vide. Dernière position : ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
       data: {
         sosId: sos._id.toString(),
@@ -399,11 +399,11 @@ export class SosService {
 
     const [lng, lat] = sos.location.coordinates;
     const bodyText = sos.voiceTranscription
-      ? `"${sos.voiceTranscription.slice(0, 100)}" — ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      ? `"${sos.voiceTranscription.slice(0, 100)}" - ${lat.toFixed(4)}, ${lng.toFixed(4)}`
       : `Position : ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
     await this.sendFcm(tokens, {
-      title: `🆘 SOS — ${emitter.pseudo} a besoin d'aide !`,
+      title: `🆘 SOS - ${emitter.pseudo} a besoin d'aide !`,
       body: bodyText,
       data: {
         sosId: sos._id.toString(),
@@ -450,7 +450,7 @@ export class SosService {
     if (tokens.length === 0) return;
 
     await this.sendFcm(tokens, {
-      title: '🆘 Alerte de proximité — AlertProche',
+      title: '🆘 Alerte de proximité - AlertProche',
       body: `${emitter.pseudo} a besoin d'aide près de vous !`,
       data: {
         sosId: sos._id.toString(),
@@ -506,7 +506,7 @@ export class SosService {
     try {
       getMessaging(); // Lance une erreur si Firebase n'est pas init
     } catch {
-      this.logger.error('Firebase Admin non initialisé — notifications SOS ignorées.');
+      this.logger.error('Firebase Admin non initialisé - notifications SOS ignorées.');
       return;
     }
 

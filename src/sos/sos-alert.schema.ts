@@ -8,7 +8,7 @@ export class SosAlert {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   userId: string;
 
-  // Position GeoJSON — mise à jour par WebSocket toutes les 10 secondes
+  // Position GeoJSON - mise à jour par WebSocket toutes les 10 secondes
   @Prop({
     type: {
       type: String,

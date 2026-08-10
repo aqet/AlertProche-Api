@@ -238,7 +238,7 @@ export class PostsService {
     try {
       getMessaging();
     } catch {
-      this.logger.error('Firebase Admin non initialisé — notification post ignorée.');
+      this.logger.error('Firebase Admin non initialisé - notification post ignorée.');
       return;
     }
 
@@ -250,7 +250,7 @@ export class PostsService {
       return;
     }
 
-    this.logger.log(`🔔 Envoi de notification push à ${allTokens.length} appareil(s) — post: ${postId}`);
+    this.logger.log(`🔔 Envoi de notification push à ${allTokens.length} appareil(s) - post: ${postId}`);
 
     const BATCH_SIZE = 500;
     let totalSuccess = 0;
@@ -333,7 +333,7 @@ export class PostsService {
       this.logger.log(`🗑 ${invalidTokens.length} token(s) invalide(s) supprimé(s) de la base.`);
     }
 
-    this.logger.log(`✅ Notification terminée — ${totalSuccess} succès, ${totalFailure} échecs sur ${allTokens.length} appareils.`);
+    this.logger.log(`✅ Notification terminée - ${totalSuccess} succès, ${totalFailure} échecs sur ${allTokens.length} appareils.`);
   }
 
   async update(id: string, dto: UpdatePostDto, user: any) {

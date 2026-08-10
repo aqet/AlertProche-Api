@@ -38,7 +38,7 @@ class LowBatteryDto {
 export class SosController {
   constructor(private readonly sosService: SosService) {}
 
-  /** POST /sos/trigger — Déclencher un SOS */
+  /** POST /sos/trigger - Déclencher un SOS */
   @Post('trigger')
   @HttpCode(HttpStatus.CREATED)
   trigger(@Body() dto: TriggerSosDto, @Req() req: any) {
@@ -52,19 +52,19 @@ export class SosController {
     );
   }
 
-  /** POST /sos/cancel — Annuler un SOS (émetteur) */
+  /** POST /sos/cancel - Annuler un SOS (émetteur) */
   @Post('cancel')
   cancel(@Body() dto: CancelSosDto, @Req() req: any) {
     return this.sosService.cancel(req.user._id.toString(), dto.sosId, dto.reason);
   }
 
-  /** POST /sos/resolve — Résoudre un SOS (émetteur ou personne de confiance) */
+  /** POST /sos/resolve - Résoudre un SOS (émetteur ou personne de confiance) */
   @Post('resolve')
   resolve(@Body() dto: ResolveSosDto, @Req() req: any) {
     return this.sosService.resolve(req.user._id.toString(), dto.sosId, dto.reason);
   }
 
-  /** POST /sos/update-location — Mise à jour GPS (WebSocket de secours) */
+  /** POST /sos/update-location - Mise à jour GPS (WebSocket de secours) */
   @Post('update-location')
   @HttpCode(HttpStatus.NO_CONTENT)
   updateLocation(@Body() dto: UpdateLocationDto, @Req() req: any) {
@@ -76,13 +76,13 @@ export class SosController {
     );
   }
 
-  /** POST /sos/respond/:sosId — "J'arrive" (personne de confiance) */
+  /** POST /sos/respond/:sosId - "J'arrive" (personne de confiance) */
   @Post('respond/:sosId')
   respond(@Param('sosId') sosId: string, @Req() req: any) {
     return this.sosService.confirmResponse(req.user._id.toString(), sosId);
   }
 
-  /** POST /sos/low-battery — Alerte batterie critique */
+  /** POST /sos/low-battery - Alerte batterie critique */
   @Post('low-battery')
   @HttpCode(HttpStatus.NO_CONTENT)
   lowBattery(@Body() dto: LowBatteryDto, @Req() req: any) {
@@ -95,13 +95,13 @@ export class SosController {
     return this.sosService.getActiveSos(req.user._id.toString());
   }
 
-  /** GET /sos/:sosId/status — Statut d'un SOS (pour polling côté émetteur et contact) */
+  /** GET /sos/:sosId/status - Statut d'un SOS (pour polling côté émetteur et contact) */
   @Get(':sosId/status')
   getSosStatus(@Param('sosId') sosId: string, @Req() req: any) {
     return this.sosService.getSosStatus(req.user._id.toString(), sosId);
   }
 
-  /** GET /sos/history — Historique complet (émis + répondu + reçu) */
+  /** GET /sos/history - Historique complet (émis + répondu + reçu) */
   @Get('history')
   getHistory(@Req() req: any) {
     return this.sosService.getFullHistory(req.user._id.toString());

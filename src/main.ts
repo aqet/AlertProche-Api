@@ -7,7 +7,7 @@ import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
-// ── Firebase Admin — initialisation unique et robuste ─────────────────────
+// ── Firebase Admin - initialisation unique et robuste ─────────────────────
 function ensureFirebaseInit() {
   if (getApps().length > 0) return; // Déjà initialisé
 
@@ -53,7 +53,7 @@ async function setupApp(app: NestExpressApplication) {
     }),
   );
 
-  // CORS — liste blanche explicite
+  // CORS - liste blanche explicite
   app.enableCors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Requêtes sans origin (Postman, server-to-server, curl)
@@ -66,7 +66,7 @@ async function setupApp(app: NestExpressApplication) {
       if (origin.endsWith('.vercel.app')) return callback(null, true);
 
       // Refuser les autres
-      return callback(new Error(`CORS: origine non autorisée — ${origin}`));
+      return callback(new Error(`CORS: origine non autorisée - ${origin}`));
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS', 'PUT', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'x-verify-token'],
@@ -75,7 +75,7 @@ async function setupApp(app: NestExpressApplication) {
     optionsSuccessStatus: 204,
   });
 
-  // Fichiers statiques (uniquement en local — Vercel est read-only)
+  // Fichiers statiques (uniquement en local - Vercel est read-only)
   if (process.env.NODE_ENV !== 'production') {
     const uploadsDir = join(process.cwd(), 'uploads', 'images');
     if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });

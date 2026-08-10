@@ -151,8 +151,46 @@ export class AiService {
     };
   }
 
-  async generateImageEmbedding(imageBase64: string, mimeType: string): Promise<number[]> {
-    try {
+  /**
+   * Génère un texte de notification push pour inciter une mise à jour de l'app.
+   * Retourne { title, body } - total ≤ 110 caractères.
+   * Fallback automatique si Gemini échoue.
+   */
+  async generateUpdateNotificationText(): Promise<{ title: string; body: string }> {
+    const FALLBACK = {
+      title: '🔄 Mise à jour disponible',
+      body: 'Nouvelles fonctionnalités et corrections de sécurité vous attendent !',
+    };
+
+    const prompt = `Génère un titre et un corps de notification push mobile très court, fluide et incitatif
+(maximum 110 caractères au total, titre + corps combinés) pour rappeler à un utilisateur de mettre à jour
+son application de sécurité citoyenne afin de profiter des nouvelles fonctionnalités et corrections.
+Sois engageant. Réponds UNIQUEMENT en JSON avec les clés "title" et "body". Exemple :
+{"title":"🆕 Mise à jour dispo !","body":"Nouvelles fonctionnalités de sécurité vous attendent."}`;
+
+    for (const model of this.modelNames) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        if (!response.text) continue;
+        const parsed = JSON.parse(response.text);
+        if (parsed.title && parsed.body) {
+          console.log(`✅ Notification update générée avec ${model}`);
+          return { title: parsed.title, body: parsed.body };
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ generateUpdateNotificationText échec avec ${model}: ${err?.message}`);
+      }
+    }
+
+    console.warn('⚠️ generateUpdateNotificationText : fallback activé.');
+    return FALLBACK;
+  }
+
+  async generateImageEmbedding(imageBase64: string, mimeType: string): Promise<number[]> {    try {
       console.log(`[IA EMBEDDING] Calcul de la signature vectorielle de la photo...`);
 
       const response = await this.ai.models.embedContent({

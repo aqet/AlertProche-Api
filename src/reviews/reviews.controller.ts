@@ -16,7 +16,7 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
-  /** GET /reviews?page=1&limit=10 — public */
+  /** GET /reviews?page=1&limit=10 - public */
   @Get()
   async findAll(
     @Query('page') page = 1,
@@ -26,13 +26,13 @@ export class ReviewsController {
     return { reviews, total, page: +page, limit: +limit };
   }
 
-  /** GET /reviews/stats — public */
+  /** GET /reviews/stats - public */
   @Get('stats')
   async getStats() {
     return this.reviewsService.getStats();
   }
 
-  /** POST /reviews — auth optionnel (les anonymes sont acceptés) */
+  /** POST /reviews - auth optionnel (les anonymes sont acceptés) */
   @UseGuards(OptionalJwtAuthGuard)
   @Post()
   async create(@Body() dto: CreateReviewDto, @Request() req: any) {

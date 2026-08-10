@@ -18,20 +18,20 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
-  // GET /comments/post/:postId — Commentaires d'une publication
+  // GET /comments/post/:postId - Commentaires d'une publication
   @Get('post/:postId')
   findByPost(@Param('postId') postId: string) {
     return this.commentsService.findByPost(postId);
   }
 
-  // GET /comments/my-comments — Mes commentaires
+  // GET /comments/my-comments - Mes commentaires
   @Get('my-comments')
   @UseGuards(JwtAuthGuard)
   findMyComments(@Request() req: any) {
     return this.commentsService.findMyComments(req.user._id.toString());
   }
 
-  // POST /comments/post/:postId — Créer un commentaire
+  // POST /comments/post/:postId - Créer un commentaire
   @Post('post/:postId')
   @UseGuards(JwtAuthGuard)
   create(
@@ -42,7 +42,7 @@ export class CommentsController {
     return this.commentsService.create(postId, dto, req.user);
   }
 
-  // DELETE /comments/:id — Supprimer un commentaire
+  // DELETE /comments/:id - Supprimer un commentaire
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)

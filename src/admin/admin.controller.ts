@@ -20,13 +20,13 @@ class UpdateRoleDto {
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  // GET /admin/stats — Statistiques globales
+  // GET /admin/stats - Statistiques globales
   @Get('stats')
   getStats() {
     return this.adminService.getStats();
   }
 
-  // GET /admin/users — Liste paginée des utilisateurs
+  // GET /admin/users - Liste paginée des utilisateurs
   @Get('users')
   async getUsers(
     @Query('page') page = '1',
@@ -36,7 +36,7 @@ export class AdminController {
     return this.adminService.getAllUsers(+page, +limit, search);
   }
 
-  // PATCH /admin/users/:id/role — Changer le rôle d'un utilisateur
+  // PATCH /admin/users/:id/role - Changer le rôle d'un utilisateur
   @Patch('users/:id/role')
   updateRole(
     @Param('id') id: string,
@@ -46,14 +46,14 @@ export class AdminController {
     return this.adminService.updateUserRole(id, dto.role, req.user);
   }
 
-  // DELETE /admin/users/:id — Supprimer un compte
+  // DELETE /admin/users/:id - Supprimer un compte
   @Delete('users/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteUser(@Param('id') id: string, @Request() req: any) {
     return this.adminService.deleteUser(id, req.user);
   }
 
-  // GET /admin/posts — Tous les posts avec filtres
+  // GET /admin/posts - Tous les posts avec filtres
   @Get('posts')
   async getPosts(
     @Query('page') page = '1',
@@ -63,7 +63,7 @@ export class AdminController {
     return this.adminService.getAllPostsAdmin(+page, +limit, filter);
   }
 
-  // DELETE /admin/posts/:id — Suppression définitive
+  // DELETE /admin/posts/:id - Suppression définitive
   @Delete('posts/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   deletePost(@Param('id') id: string) {
