@@ -35,7 +35,7 @@ ensureFirebaseInit();
 const ALLOWED_ORIGINS = [
   'https://alertproche.com',
   'https://www.alertproche.com',
-  'https://alert-proche.vercel.app',
+  'https://alertproche.com',
   'http://localhost:4200',
   'https://localhost',
 ];
