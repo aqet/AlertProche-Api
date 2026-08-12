@@ -33,6 +33,8 @@ ensureFirebaseInit();
 
 // Origines autorisées
 const ALLOWED_ORIGINS = [
+  'https://alertproche.com',
+  'https://www.alertproche.com',
   'https://alert-proche.vercel.app',
   'http://localhost:4200',
   'https://localhost',
