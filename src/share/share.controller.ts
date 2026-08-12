@@ -2,7 +2,7 @@ import { Controller, Get, Param, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { PostsService } from '../posts/posts.service';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://alert-proche.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://alertproche.com';
 const SITE_NAME    = 'AlertProche';
 const SITE_SLOGAN  = 'Protéger les personnes vulnérables, c\'est l\'affaire de tous.';
 const FALLBACK_IMG = `${FRONTEND_URL}/favicon.ico`;

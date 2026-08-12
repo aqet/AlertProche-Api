@@ -89,7 +89,7 @@ export class MailService {
         const html = this.renderTemplate('generalMail', {
           pseudo: user.pseudo, // FIX: Syntaxe clé-valeur corrigée
           email: user.email, // FIX: Utilise l'email du user de la BDD
-          update_location_url: 'https://alert-proche.vercel.app/dashboard', // FIX: Utilise l'URL dynamique du .env
+          update_location_url: 'https://alertproche.com/dashboard', // FIX: Utilise l'URL dynamique du .env
         });
 
         // Envoi unitaire
