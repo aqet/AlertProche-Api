@@ -84,6 +84,32 @@ export class PostsController {
     return this.postsService.findOne(id);
   }
 
+  @Post('validate-city')
+  @UseGuards(JwtAuthGuard)
+  async validateCity(@Body() body: { city: string }) {
+    if (!body.city?.trim()) throw new BadRequestException('Nom de ville manquant.');
+    return this.aiService.validateCameroonCity(body.city.trim());
+  }
+
+  @Post('parse-audio')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('audio', {
+    storage: memoryStorage(), // Uniquement en mémoire — aucun fichier sur le disque
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo max
+  }))
+  async parseAudio(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Fichier audio manquant.');
+
+    const allowedAudioMimes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/mp4'];
+    if (!allowedAudioMimes.includes(file.mimetype)) {
+      throw new BadRequestException(`Format audio non supporté : ${file.mimetype}`);
+    }
+
+    const result = await this.aiService.parseAudioToForm(file.buffer, file.mimetype);
+    // Le buffer est libéré automatiquement par le GC — aucun stockage persistant
+    return result;
+  }
+
   @Post('analyze-image')
   @UseGuards(JwtAuthGuard)
   async analyzeImageForCompletion(@Body() body: AnalyzeImageDto) {

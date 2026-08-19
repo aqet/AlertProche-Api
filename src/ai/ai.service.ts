@@ -17,6 +17,22 @@ export interface FormCompletionResult {
   confidence: number;
 }
 
+// 💡 Interface pour le résultat d'analyse audio → formulaire
+export interface ParsedAudioAlertDto {
+  type: 'Disparition' | 'Abus' | 'Prevention' | "Appel à l'aide" | null;
+  title: string | null;
+  content: string | null;
+  location: string | null;
+  isAnonymous: boolean | null;
+}
+
+// 💡 Interface pour la validation d'une ville libre
+export interface CityValidationResult {
+  valid: boolean;
+  normalizedName: string | null; // Nom corrigé/normalisé si valide
+  reason: string;
+}
+
 @Injectable()
 export class AiService {
   private ai: GoogleGenAI;
@@ -187,6 +203,108 @@ Sois engageant. Réponds UNIQUEMENT en JSON avec les clés "title" et "body". Ex
     }
 
     console.warn('⚠️ generateUpdateNotificationText : fallback activé.');
+    return FALLBACK;
+  }
+
+  /**
+   * Valide si un nom de ville/localité appartient au Cameroun.
+   * Retourne le nom normalisé si valide, sinon valid=false.
+   */
+  async validateCameroonCity(cityName: string): Promise<CityValidationResult> {
+    const FALLBACK: CityValidationResult = {
+      valid: false,
+      normalizedName: null,
+      reason: 'Impossible de valider la ville pour le moment.',
+    };
+
+    const prompt = `Est-ce que "${cityName}" est une ville, commune, quartier ou localité réelle située au Cameroun ?
+Réponds UNIQUEMENT avec un objet JSON contenant exactement ces clés :
+- "valid": true si la localité existe au Cameroun, false sinon.
+- "normalizedName": le nom correctement orthographié et accentué si valid=true, null sinon.
+- "reason": une courte phrase en français expliquant ta réponse.`;
+
+    for (const model of this.modelNames) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        if (!response.text) continue;
+        const result: CityValidationResult = JSON.parse(response.text);
+        console.log(`✅ Validation ville "${cityName}" avec ${model}: ${result.valid}`);
+        return result;
+      } catch (err: any) {
+        console.warn(`⚠️ validateCity échec avec ${model}: ${err?.message}`);
+      }
+    }
+
+    return FALLBACK;
+  }
+
+  /**
+   * Analyse un buffer audio et extrait les données pour pré-remplir le formulaire d'alerte.
+   * L'audio est traité uniquement en mémoire — aucun fichier n'est créé sur le disque.
+   */
+  async parseAudioToForm(audioBuffer: Buffer, mimeType: string): Promise<ParsedAudioAlertDto> {
+    const FALLBACK: ParsedAudioAlertDto = {
+      type: null,
+      title: null,
+      content: null,
+      location: null,
+      isAnonymous: null,
+    };
+
+    const audioPart = {
+      inlineData: {
+        data: audioBuffer.toString('base64'),
+        mimeType,
+      },
+    };
+
+    const systemInstruction = `Tu es un assistant d'extraction de données pour une application de sécurité d'urgence au Cameroun.
+Écoute cet extrait audio et extrais toutes les informations pertinentes pour remplir une fiche d'alerte citoyenne.
+Ignore les bruits de fond, les hésitations ("euh", "hm") et les répétitions.
+Réponds EXCLUSIVEMENT avec un objet JSON valide contenant exactement ces clés :
+- "type" : Le type de signalement parmi : "Disparition", "Abus", "Prevention", "Appel à l'aide". Si incertain, choisis le plus proche ou null.
+- "title" : Un titre d'alerte clair et percutant (maximum 150 caractères). Commence par "URGENT – " si la situation est grave. null si impossible.
+- "content" : La description complète et détaillée de la situation (noms, âge, description physique, vêtements, lieu, heure, circonstances). null si impossible.
+- "location" : La ville ou région camerounaise mentionnée (ex: "Yaoundé", "Douala", "Bafoussam"). null si non mentionnée.
+- "isAnonymous" : true si la personne exprime le souhait de rester anonyme, false sinon, null si non précisé.
+Si une information est absente ou incertaine, indique null pour ce champ.`;
+
+    // Modèles avec support audio multimodal (Flash uniquement)
+    const audioModels = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash-lite',
+    ];
+
+    for (const model of audioModels) {
+      try {
+        console.log(`[IA AUDIO] Tentative d'analyse avec le modèle : ${model}`);
+
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: [audioPart, 'Analyse cet audio et extrais les informations pour le formulaire d\'alerte.'],
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        if (!response.text) throw new Error(`Réponse vide du modèle ${model}`);
+
+        const result: ParsedAudioAlertDto = JSON.parse(response.text);
+        console.log(`✅ Audio analysé avec succès via ${model}`);
+        return result;
+      } catch (error: any) {
+        console.warn(`⚠️ Échec audio avec ${model}: ${error?.status || error?.message}. Passage au suivant...`);
+      }
+    }
+
+    console.error('❌ Tous les modèles audio ont échoué — retour du fallback vide.');
     return FALLBACK;
   }
 
