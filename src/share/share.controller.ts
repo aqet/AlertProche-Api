@@ -29,7 +29,7 @@ export class ShareController {
     try {
       const post = await this.postsService.findOne(id);
       const postUrl  = `${FRONTEND_URL}/posts/${id}`;
-      const shareUrl = `${process.env.API_URL || 'https://alert-proche-api.vercel.app'}/share/posts/${id}`;
+      const shareUrl = `${process.env.API_URL || 'https://api.alertproche.com'}/share/posts/${id}`;
       const image    = post.image_url || FALLBACK_IMG;
       const emoji    = TYPE_EMOJI[post.type] || '📢';
 
