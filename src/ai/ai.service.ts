@@ -243,6 +243,38 @@ Réponds UNIQUEMENT avec un objet JSON contenant exactement ces clés :
   }
 
   /**
+   * Valide si une ville saisie librement est une localité camerounaise.
+   * Retourne { valid, normalizedName }.
+   */
+  async validateCityName(city: string): Promise<{ valid: boolean; normalizedName: string | null }> {
+    const FALLBACK = { valid: false, normalizedName: null };
+
+    const prompt = `L'utilisateur a saisi "${city}" comme localisation dans une application de sécurité au Cameroun.
+Est-ce une ville, commune, arrondissement ou localité réellement existant au Cameroun ?
+Si oui, donne son nom normalisé (en minuscules, sans fautes, orthographe officielle française).
+Réponds UNIQUEMENT avec un objet JSON : {"valid": true|false, "normalizedName": "nom normalisé" | null}`;
+
+    for (const model of this.modelNames) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        if (!response.text) continue;
+        const result = JSON.parse(response.text);
+        if (typeof result.valid === 'boolean') {
+          console.log(`✅ validateCityName "${city}" → valid=${result.valid} via ${model}`);
+          return result;
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ validateCityName échec avec ${model}: ${err?.message}`);
+      }
+    }
+    return FALLBACK;
+  }
+
+  /**
    * Analyse un buffer audio et extrait les données pour pré-remplir le formulaire d'alerte.
    * L'audio est traité uniquement en mémoire — aucun fichier n'est créé sur le disque.
    */
