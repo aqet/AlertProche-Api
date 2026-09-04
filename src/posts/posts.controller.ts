@@ -86,9 +86,11 @@ export class PostsController {
 
   @Post('validate-city')
   @UseGuards(JwtAuthGuard)
-  async validateCity(@Body() body: { city: string }) {
-    if (!body.city?.trim()) throw new BadRequestException('Nom de ville manquant.');
-    return this.aiService.validateCameroonCity(body.city.trim());
+  async validateCity(@Body('city') city: string) {
+    if (!city || typeof city !== 'string' || !city.trim()) {
+      throw new BadRequestException('Nom de ville manquant.');
+    }
+    return this.aiService.validateCityName(city.trim());
   }
 
   @Post('parse-audio')
