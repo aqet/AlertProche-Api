@@ -563,7 +563,7 @@ export class SosService {
           priority: 'high' as const,
           notification: {
             channelId: isSos ? 'alertproche_sos_channel' : 'alertproche_notifications',
-            sound: isSos ? 'sos-alert' : 'default',
+            sound: 'sos-alert',
             priority: 'max' as const,
             visibility: 'public' as const,
             defaultSound: !isSos,
@@ -576,7 +576,7 @@ export class SosService {
           headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
           payload: {
             aps: {
-              sound: isSos ? 'sos-alert' : 'default',
+              sound: 'sos-alert',
               badge: 1,
               'content-available': 1,
             },
