@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Post, PostDocument } from '../schemas/post.schema';
 import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -13,18 +13,11 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
 import { AiService } from 'src/ai/ai.service';
 import { MailService } from 'src/mail/mail.service';
-import {
-  AppDownload,
-  AppDownloadDocument,
-} from '../schemas/app-download.schema';
-
+import { AppDownload, AppDownloadDocument } from '../schemas/app-download.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../notifications/web-push.service';
 import { User, UserDocument } from 'src/schemas/user.schema';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
-// =======
-// import { User, UserDocument } from 'src/schemas/user.schema';
-// import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
-// >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 
 @Injectable()
 export class PostsService {
@@ -35,11 +28,11 @@ export class PostsService {
     @InjectModel(AppDownload.name)
     private appDownloadModel: Model<AppDownloadDocument>,
 // <<<<<<< HEAD
-    // @InjectModel(User.name) private userModel: Model<UserDocument>,
     private moderationService: ModerationService,
     private aiService: AiService,
     private mailService: MailService,
     private notificationsService: NotificationsService,
+    private webPush: WebPushService,
 // =======
     // private moderationService: ModerationService,
     // private aiService: AiService,
@@ -230,71 +223,77 @@ export class PostsService {
   }
 
   /**
-   * Envoie une notification push FCM à tous les appareils enregistrés.
-   * Nettoie automatiquement les tokens invalides/expirés.
+   * Envoie une notification push FCM ou Web Push à tous les appareils enregistrés.
+   * Détecte automatiquement le type de token (FCM string vs PushSubscription JSON).
    */
   async sendNewPostNotification(postTitle: string, postId: string) {
-    // Guard Firebase
-    try {
-      getMessaging();
-    } catch {
-      this.logger.error('Firebase Admin non initialisé - notification post ignorée.');
-      return;
-    }
-
     const users = await this.userModel.find({ 'token.0': { $exists: true } }, { _id: 1, token: 1 }).lean().exec();
-    const allTokens = [...new Set(users.flatMap((user) => user.token).filter(Boolean))];
+    const allTokens = [...new Set(users.flatMap((u) => u.token).filter(Boolean))];
 
     if (allTokens.length === 0) {
-      this.logger.warn('Notification push ignorée : aucun token enregistré.');
+      this.logger.warn('Notification post ignorée : aucun token enregistré.');
       return;
     }
 
-    this.logger.log(`🔔 Envoi de notification push à ${allTokens.length} appareil(s) - post: ${postId}`);
+    // Séparer FCM et Web Push
+    const fcmTokens     = allTokens.filter(t => !WebPushService.isWebPushToken(t));
+    const webPushTokens = allTokens.filter(t =>  WebPushService.isWebPushToken(t));
+
+    this.logger.log(`🔔 Notification post "${postId}" → ${fcmTokens.length} FCM + ${webPushTokens.length} Web Push`);
+
+    const title = '🚨 Nouvelle alerte AlertProche';
+    const body  = postTitle;
+    const data  = { postId: postId.toString(), type: 'NEW_POST' };
+
+    // ── Web Push ─────────────────────────────────────────────────────────
+    const expiredWebPush: string[] = [];
+    await Promise.all(
+      webPushTokens.map(async (token) => {
+        const sent = await this.webPush.sendNotification(token, { title, body, data });
+        if (!sent) expiredWebPush.push(token);
+      }),
+    );
+    if (expiredWebPush.length > 0) {
+      await this.userModel.updateMany(
+        { token: { $in: expiredWebPush } },
+        { $pull: { token: { $in: expiredWebPush } } },
+      );
+      this.logger.log(`🗑 ${expiredWebPush.length} subscription(s) Web Push expirée(s) supprimée(s).`);
+    }
+
+    // ── FCM ───────────────────────────────────────────────────────────────
+    if (fcmTokens.length === 0) return;
+
+    try { getMessaging(); } catch {
+      this.logger.error('Firebase Admin non initialisé - notification post FCM ignorée.');
+      return;
+    }
 
     const BATCH_SIZE = 500;
     let totalSuccess = 0;
     let totalFailure = 0;
     const invalidTokens: string[] = [];
 
-    for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
-      const batchTokens = allTokens.slice(i, i + BATCH_SIZE);
-
+    for (let i = 0; i < fcmTokens.length; i += BATCH_SIZE) {
+      const batchTokens = fcmTokens.slice(i, i + BATCH_SIZE);
       const message: MulticastMessage = {
         tokens: batchTokens,
-        notification: {
-          title: '🚨 Nouvelle alerte AlertProche',
-          body: postTitle,
-        },
-        data: {
-          postId: postId.toString(),
-          type: 'NEW_POST',
-        },
-        // Force l'affichage en bannière plein écran sur Android
+        notification: { title, body },
+        data,
         android: {
           priority: 'high',
           notification: {
-            channelId: 'alertproche_notifications', // Canal créé dans l'app mobile avec IMPORTANCE_HIGH
+            channelId: 'alertproche_notifications',
             sound: 'default',
-            priority: 'max',              // Bannière Heads-Up visible même en veille
-            visibility: 'public',         // Visible sur l'écran verrouillé
+            priority: 'max',
+            visibility: 'public',
             defaultSound: true,
             defaultVibrateTimings: true,
           },
         },
-        // iOS
         apns: {
-          headers: {
-            'apns-priority': '10',
-            'apns-push-type': 'alert',
-          },
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-              'content-available': 1,
-            },
-          },
+          headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+          payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } },
         },
       };
 
@@ -302,38 +301,29 @@ export class PostsService {
         const response = await getMessaging().sendEachForMulticast(message);
         totalSuccess += response.successCount;
         totalFailure += response.failureCount;
-
-        // Collecter les tokens invalides pour les supprimer
         response.responses.forEach((res, idx) => {
           if (!res.success) {
             const code = res.error?.code;
             if (
               code === 'messaging/invalid-registration-token' ||
               code === 'messaging/registration-token-not-registered'
-            ) {
-              invalidTokens.push(batchTokens[idx]);
-            }
-            this.logger.warn(`Token ${batchTokens[idx].slice(0, 20)}... échoué : ${code}`);
+            ) invalidTokens.push(batchTokens[idx]);
           }
         });
-
-        this.logger.log(`Lot ${Math.floor(i / BATCH_SIZE) + 1} : ${response.successCount} succès / ${response.failureCount} échecs`);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1} :`, errorMessage);
+        this.logger.error(`Erreur FCM lot ${Math.floor(i / BATCH_SIZE) + 1}:`, error instanceof Error ? error.message : String(error));
       }
     }
 
-    // Supprimer les tokens invalides de la base
     if (invalidTokens.length > 0) {
       await this.userModel.updateMany(
         { token: { $in: invalidTokens } },
         { $pull: { token: { $in: invalidTokens } } },
       );
-      this.logger.log(`🗑 ${invalidTokens.length} token(s) invalide(s) supprimé(s) de la base.`);
+      this.logger.log(`🗑 ${invalidTokens.length} token(s) FCM invalide(s) supprimé(s).`);
     }
 
-    this.logger.log(`✅ Notification terminée - ${totalSuccess} succès, ${totalFailure} échecs sur ${allTokens.length} appareils.`);
+    this.logger.log(`✅ Post notification terminée - ${totalSuccess} succès FCM, ${totalFailure} échecs.`);
   }
 
   async update(id: string, dto: UpdatePostDto, user: any) {

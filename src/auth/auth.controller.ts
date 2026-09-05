@@ -99,6 +99,14 @@ export class AuthController {
     return { message: 'Token enregistré avec succès', token: user.token };
   }
 
+  /** GET /auth/vapid-public-key - Clé VAPID publique pour Web Push */
+  @Get('vapid-public-key')
+  getVapidPublicKey() {
+    const key = process.env.VAPID_PUBLIC_KEY;
+    if (!key) return { key: null };
+    return { key };
+  }
+
   /** GET /auth/users/search?q=pseudo - Rechercher des utilisateurs par pseudo */
   @Get('users/search')
   @UseGuards(JwtAuthGuard)
