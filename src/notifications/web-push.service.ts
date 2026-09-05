@@ -70,13 +70,19 @@ export class WebPushService {
         badge: '/icons/favicon-96x96.png',
         requireInteraction: payload.requireInteraction ?? false,
         vibrate: payload.vibrate ?? [200, 100, 200],
-        data: payload.data || {},
+        data: {
+          ...payload.data || {},
+          soundUrl: payload.data?.type?.startsWith('SOS') ? '/sounds/sos-alert.mp3' : null,
+        },
         actions: payload.data?.type?.startsWith('SOS') ? [
           { action: 'respond', title: "J'arrive" },
           { action: 'dismiss', title: 'Ignorer' },
         ] : [],
       },
-      data: payload.data || {},
+      data: {
+        ...payload.data || {},
+        soundUrl: payload.data?.type?.startsWith('SOS') ? '/sounds/sos-alert.mp3' : null,
+      },
     });
 
     try {
