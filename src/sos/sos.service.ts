@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import * as bcrypt from 'bcryptjs';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
 import { SosAlert, SosAlertDocument } from './sos-alert.schema';
 import { User, UserDocument } from '../schemas/user.schema';
+import { WebPushService } from '../notifications/web-push.service';
 
 @Injectable()
 export class SosService {
@@ -19,6 +19,7 @@ export class SosService {
   constructor(
     @InjectModel(SosAlert.name) private sosModel: Model<SosAlertDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private webPush: WebPushService,
   ) {}
 
   // ── DÉCLENCHER UN SOS ───────────────────────────────────────────────────
@@ -495,24 +496,65 @@ export class SosService {
     return this.userModel.find({ _id: { $in: acceptedIds } }).lean();
   }
 
-  // ── HELPER FCM ─────────────────────────────────────────────────────────
-  private async sendFcm(
+  // ── HELPER UNIFIÉ : FCM + Web Push ────────────────────────────────────
+  private async sendNotifications(
     tokens: string[],
-    payload: { title: string; body: string; data?: Record<string, string> },
+    payload: { title: string; body: string; data?: Record<string, string>; isSos?: boolean },
   ): Promise<void> {
     if (tokens.length === 0) return;
 
-    // Guard : Firebase doit être initialisé
+    const fcmTokens: string[] = [];
+    const webPushTokens: string[] = [];
+
+    // Trier les tokens selon leur type
+    for (const token of tokens) {
+      if (WebPushService.isWebPushToken(token)) {
+        webPushTokens.push(token);
+      } else {
+        fcmTokens.push(token);
+      }
+    }
+
+    const isSos = payload.isSos ?? false;
+    const vibrate = isSos ? [300, 100, 300, 100, 300] : [200, 100, 200];
+
+    // ── Envoi Web Push (PWA) ──────────────────────────────────────────────
+    const expiredWebPush: string[] = [];
+    await Promise.all(
+      webPushTokens.map(async (token) => {
+        const sent = await this.webPush.sendNotification(token, {
+          title: payload.title,
+          body: payload.body,
+          data: payload.data,
+          requireInteraction: isSos,
+          vibrate,
+        });
+        if (!sent) expiredWebPush.push(token);
+      }),
+    );
+
+    // Nettoyer les subscriptions expirées
+    if (expiredWebPush.length > 0) {
+      await this.userModel.updateMany(
+        { token: { $in: expiredWebPush } },
+        { $pull: { token: { $in: expiredWebPush } } },
+      );
+      this.logger.log(`🗑 ${expiredWebPush.length} subscription(s) Web Push expirée(s) supprimée(s).`);
+    }
+
+    // ── Envoi FCM (tokens natifs Android) ────────────────────────────────
+    if (fcmTokens.length === 0) return;
+
     try {
-      getMessaging(); // Lance une erreur si Firebase n'est pas init
+      getMessaging();
     } catch {
-      this.logger.error('Firebase Admin non initialisé - notifications SOS ignorées.');
+      this.logger.error('Firebase Admin non initialisé - notifications FCM ignorées.');
       return;
     }
 
     const BATCH = 500;
-    for (let i = 0; i < tokens.length; i += BATCH) {
-      const batch = tokens.slice(i, i + BATCH);
+    for (let i = 0; i < fcmTokens.length; i += BATCH) {
+      const batch = fcmTokens.slice(i, i + BATCH);
       const message: MulticastMessage = {
         tokens: batch,
         notification: { title: payload.title, body: payload.body },
@@ -520,32 +562,63 @@ export class SosService {
         android: {
           priority: 'high' as const,
           notification: {
-            channelId: 'alertproche_sos_channel', // Nouveau canal spécifique aux SOS
-            sound: 'alertsos', // Nom du fichier dans res/raw (SANS .mp3)
-            priority: 'max' as const, // Affichage Heads-Up immédiat
-            visibility: 'public' as const, // Visible sur l'écran verrouillé
-            defaultSound: false, // IMPORTANT : Désactiver le son système
-            defaultVibrateTimings: false, // Personnaliser ou laisser la vibration
-            vibrateTimingsMillis: [0, 500, 200, 500, 200, 1000], // Motifs de vibration d'urgence
+            channelId: isSos ? 'alertproche_sos_channel' : 'alertproche_notifications',
+            sound: isSos ? 'alertsos' : 'default',
+            priority: 'max' as const,
+            visibility: 'public' as const,
+            defaultSound: !isSos,
+            defaultVibrateTimings: !isSos,
+            vibrateTimingsMillis: isSos ? [0, 500, 200, 500, 200, 1000] : undefined,
             notificationCount: 1,
           },
         },
         apns: {
           headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
           payload: {
-            aps: { sound: 'alertsos', badge: 1, 'content-available': 1 },
+            aps: {
+              sound: isSos ? 'alertsos' : 'default',
+              badge: 1,
+              'content-available': 1,
+            },
           },
         },
       };
 
       try {
         const response = await getMessaging().sendEachForMulticast(message);
-        this.logger.log(
-          `FCM SOS : ${response.successCount} succès / ${response.failureCount} échecs`,
-        );
+        this.logger.log(`FCM : ${response.successCount} succès / ${response.failureCount} échecs`);
+
+        // Nettoyer les tokens FCM invalides
+        const invalidFcm: string[] = [];
+        response.responses.forEach((res, idx) => {
+          if (!res.success) {
+            const code = res.error?.code;
+            if (
+              code === 'messaging/invalid-registration-token' ||
+              code === 'messaging/registration-token-not-registered'
+            ) {
+              invalidFcm.push(batch[idx]);
+            }
+          }
+        });
+        if (invalidFcm.length > 0) {
+          await this.userModel.updateMany(
+            { token: { $in: invalidFcm } },
+            { $pull: { token: { $in: invalidFcm } } },
+          );
+          this.logger.log(`🗑 ${invalidFcm.length} token(s) FCM invalide(s) supprimé(s).`);
+        }
       } catch (err: any) {
-        this.logger.error('Erreur FCM SOS :', err?.message);
+        this.logger.error('Erreur FCM :', err?.message);
       }
     }
+  }
+
+  // ── HELPER FCM (legacy - conservé pour compatibilité) ─────────────────
+  private async sendFcm(
+    tokens: string[],
+    payload: { title: string; body: string; data?: Record<string, string> },
+  ): Promise<void> {
+    return this.sendNotifications(tokens, { ...payload, isSos: true });
   }
 }
