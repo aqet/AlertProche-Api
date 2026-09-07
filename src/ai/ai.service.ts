@@ -217,7 +217,7 @@ Sois engageant. Réponds UNIQUEMENT en JSON avec les clés "title" et "body". Ex
       reason: 'Impossible de valider la ville pour le moment.',
     };
 
-    const prompt = `Est-ce que "${cityName}" est une ville, commune, quartier ou localité réelle située au Cameroun ?
+    const prompt = `Est-ce que "${cityName}" est une ville, commune, quartier ou localité réelle dans le monde ?
 Réponds UNIQUEMENT avec un objet JSON contenant exactement ces clés :
 - "valid": true si la localité existe au Cameroun, false sinon.
 - "normalizedName": le nom correctement orthographié et accentué si valid=true, null sinon.
@@ -249,8 +249,8 @@ Réponds UNIQUEMENT avec un objet JSON contenant exactement ces clés :
   async validateCityName(city: string): Promise<{ valid: boolean; normalizedName: string | null }> {
     const FALLBACK = { valid: false, normalizedName: null };
 
-    const prompt = `L'utilisateur a saisi "${city}" comme localisation dans une application de sécurité au Cameroun.
-Est-ce une ville, commune, arrondissement ou localité réellement existant au Cameroun ?
+    const prompt = `L'utilisateur a saisi "${city}" comme localisation dans une application de sécurité.
+Est-ce une ville, commune, arrondissement ou localité réellement existant dans le monde ?
 Si oui, donne son nom normalisé (en minuscules, sans fautes, orthographe officielle française).
 Réponds UNIQUEMENT avec un objet JSON : {"valid": true|false, "normalizedName": "nom normalisé" | null}`;
 
@@ -301,7 +301,7 @@ Réponds EXCLUSIVEMENT avec un objet JSON valide contenant exactement ces clés 
 - "type" : Le type de signalement parmi : "Disparition", "Abus", "Prevention", "Appel à l'aide". Si incertain, choisis le plus proche ou null.
 - "title" : Un titre d'alerte clair et percutant (maximum 150 caractères). Commence par "URGENT – " si la situation est grave. null si impossible.
 - "content" : La description complète et détaillée de la situation (noms, âge, description physique, vêtements, lieu, heure, circonstances). null si impossible.
-- "location" : La ville ou région camerounaise mentionnée (ex: "Yaoundé", "Douala", "Bafoussam"). null si non mentionnée.
+- "location" : La ville ou région du monde mentionnée (ex: "Yaoundé", "Hong Kong", "Doubaille"). null si non mentionnée.
 - "isAnonymous" : true si la personne exprime le souhait de rester anonyme, false sinon, null si non précisé.
 Si une information est absente ou incertaine, indique null pour ce champ.`;
 
