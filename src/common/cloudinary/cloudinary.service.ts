@@ -24,6 +24,73 @@ export class CloudinaryService {
   }
 
   /**
+   * Upload un média du feed (image ou vidéo) avec optimisation dédiée.
+   * Retourne l'URL sécurisée ET les métadonnées Cloudinary pour suppression fiable.
+   */
+  async uploadFeedMedia(
+    buffer: Buffer,
+    filename: string,
+    mediaType: 'image' | 'video',
+  ): Promise<{ url: string; publicId: string; resourceType: 'image' | 'video' }> {
+    if (!this.isConfigured) {
+      throw new InternalServerErrorException(
+        'Cloudinary non configuré. Vérifiez les variables d\'environnement.',
+      );
+    }
+
+    const isVideo  = mediaType === 'video';
+    const folder   = isVideo ? 'alertproche/feed_videos' : 'alertproche/feed_images';
+    const publicId = `${folder}/${Date.now()}-${filename.replace(/\.[^.]+$/, '')}`;
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          public_id:     publicId,
+          folder,
+          resource_type: isVideo ? 'video' : 'image',
+          ...(isVideo
+            ? {
+                transformation: [
+                  { width: 720, crop: 'limit' },
+                  { quality: 'auto' },
+                ],
+              }
+            : {
+                format: 'webp',
+                transformation: [
+                  { width: 1080, crop: 'limit' },
+                  { quality: 'auto' },
+                ],
+                allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+              }),
+          eager_async: false,
+        },
+        (error, result: UploadApiResponse | undefined) => {
+          if (error) return reject(new InternalServerErrorException(`Cloudinary feed upload error: ${error.message}`));
+          if (!result) return reject(new InternalServerErrorException('Cloudinary: pas de résultat'));
+          resolve({
+            url:          result.secure_url,
+            publicId:     result.public_id,
+            resourceType: isVideo ? 'video' : 'image',
+          });
+        },
+      );
+      streamifier.createReadStream(buffer).pipe(uploadStream);
+    });
+  }
+
+  /**
+   * Supprime un asset Cloudinary avec public_id et resource_type exacts.
+   * Plus fiable que deleteByUrl car n'a pas besoin de détecter le type.
+   */
+  async deleteAsset(publicId: string, resourceType: 'image' | 'video'): Promise<void> {
+    if (!this.isConfigured) return;
+    try {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    } catch { /* ignore */ }
+  }
+
+  /**
    * Upload un fichier Buffer vers Cloudinary.
    * Retourne l'URL sécurisée de l'image.
    */
@@ -62,7 +129,9 @@ export class CloudinaryService {
   }
 
   /**
-   * Supprime une image Cloudinary à partir de son URL.
+   * Supprime un média Cloudinary à partir de son URL.
+   * Détecte automatiquement si c'est une vidéo (resource_type: 'video')
+   * ou une image (resource_type: 'image').
    */
   async deleteByUrl(url: string): Promise<void> {
     if (!this.isConfigured || !url?.includes('cloudinary.com')) return;
@@ -76,7 +145,16 @@ export class CloudinaryService {
       const startIndex = afterUpload[0]?.startsWith('v') ? 1 : 0;
       const publicIdWithExt = afterUpload.slice(startIndex).join('/');
       const publicId = publicIdWithExt.replace(/\.[^.]+$/, '');
-      await cloudinary.uploader.destroy(publicId);
+
+      // Détecter le resource_type depuis le dossier ou l'extension
+      const isVideo =
+        publicId.includes('feed_videos') ||
+        publicId.includes('/video/') ||
+        /\.(mp4|webm|mov|avi|mkv)$/i.test(url);
+
+      await cloudinary.uploader.destroy(publicId, {
+        resource_type: isVideo ? 'video' : 'image',
+      });
     } catch { /* ignore les erreurs de suppression */ }
   }
 }

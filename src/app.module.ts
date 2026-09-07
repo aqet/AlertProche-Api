@@ -12,6 +12,7 @@ import { AiModule } from './ai/ai.module';
 import { SosModule } from './sos/sos.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { VersionsModule } from './versions/versions.module';
+import { FeedModule } from './feed/feed.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -45,6 +46,7 @@ import { AppService } from './app.service';
     TrackingModule,
     SosModule,
     VersionsModule,
+    FeedModule,
   ],
   controllers: [AppController],
   providers: [AppService]
