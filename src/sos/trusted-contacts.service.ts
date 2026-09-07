@@ -8,12 +8,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { getMessaging } from 'firebase-admin/messaging';
 import { User, UserDocument } from '../schemas/user.schema';
+import { WebPushService } from '../notifications/web-push.service';
 
 @Injectable()
 export class TrustedContactsService {
   private readonly logger = new Logger(TrustedContactsService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly webPush: WebPushService,
+  ) {}
 
   /** Récupérer mes personnes de confiance avec leur profil */
   async getMyContacts(userId: string) {
@@ -38,7 +42,6 @@ export class TrustedContactsService {
 
   /** Invitations reçues en attente de réponse */
   async getPendingInvitations(userId: string) {
-    // Chercher les utilisateurs qui ont ce userId dans leurs trustedContacts avec status PENDING
     const inviters = await this.userModel
       .find({
         'trustedContacts.userId': new Types.ObjectId(userId),
@@ -138,7 +141,6 @@ export class TrustedContactsService {
 
   /**
    * Se retirer soi-même de la liste d'un autre utilisateur.
-   * Appelé par l'utilisateur B qui veut ne plus être contact de confiance de A.
    * ownerId = A (celui dont on veut quitter la liste)
    * selfId  = B (l'appelant - celui qui se retire)
    */
@@ -157,27 +159,15 @@ export class TrustedContactsService {
 
     // Notifier A que B s'est retiré
     const self = await this.userModel.findById(selfId).select('pseudo token').lean();
-    const tokens = (owner.token || []).filter(Boolean);
-    if (tokens.length > 0 && self) {
-      try {
-        const { getMessaging } = await import('firebase-admin/messaging');
-        await getMessaging().sendEachForMulticast({
-          tokens,
-          notification: {
-            title: 'AlertProche - Contact retiré',
-            body: `${self.pseudo} ne fait plus partie de vos contacts de confiance.`,
-          },
+    if (self) {
+      const ownerTokens = (owner.token || []).filter(Boolean);
+      if (ownerTokens.length > 0) {
+        await this.sendNotifications(ownerTokens, {
+          title: 'AlertProche - Contact retiré',
+          body: `${self.pseudo} ne fait plus partie de vos contacts de confiance.`,
           data: { type: 'TRUSTED_CONTACT_LEFT', pseudo: self.pseudo },
-          android: {
-            priority: 'high',
-            notification: { channelId: 'alertproche_notifications', sound: 'default' },
-          },
-          apns: {
-            headers: { 'apns-priority': '10' },
-            payload: { aps: { sound: 'default', badge: 1 } },
-          },
         });
-      } catch { /* Notification non bloquante */ }
+      }
     }
 
     return { message: `Vous avez quitté la liste de contacts de confiance de ${owner.pseudo}.` };
@@ -205,74 +195,135 @@ export class TrustedContactsService {
   private async sendInvitationNotification(
     inviterPseudo: string,
     contact: any,
-  ) {
+  ): Promise<void> {
     const tokens = (contact.token || []).filter(Boolean);
     if (tokens.length === 0) return;
 
-    try {
-      await getMessaging().sendEachForMulticast({
-        tokens,
-        notification: {
-          title: '🤝 Invitation AlertProche',
-          body: `${inviterPseudo} souhaite vous ajouter comme Personne de Confiance.`,
-        },
-        data: { type: 'TRUSTED_CONTACT_INVITE', inviterPseudo },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: 'alertproche_notifications',
-            sound: 'default',
-          },
-        },
-        apns: {
-          headers: { 'apns-priority': '10' },
-          payload: { aps: { sound: 'default', badge: 1 } },
-        },
-      });
-    } catch (err: any) {
-      this.logger.error('Erreur notification invitation :', err?.message);
-    }
+    await this.sendNotifications(tokens, {
+      title: '🤝 Invitation AlertProche',
+      body: `${inviterPseudo} souhaite vous ajouter comme Personne de Confiance.`,
+      data: { type: 'TRUSTED_CONTACT_INVITE', inviterPseudo },
+    });
   }
 
   private async sendResponseNotification(
     responder: any,
     inviter: any,
     action: 'accept' | 'reject',
-  ) {
+  ): Promise<void> {
     const tokens = (inviter.token || []).filter(Boolean);
     if (tokens.length === 0) return;
 
-    const msg =
+    const body =
       action === 'accept'
         ? `${responder.pseudo} a accepté votre invitation. ✅`
         : `${responder.pseudo} a refusé votre invitation.`;
 
+    await this.sendNotifications(tokens, {
+      title: 'AlertProche - Réponse à votre invitation',
+      body,
+      data: {
+        type: 'TRUSTED_CONTACT_RESPONSE',
+        action,
+        responderPseudo: responder.pseudo,
+      },
+    });
+  }
+
+  /**
+   * Helper unifié : envoie aux tokens Web Push (PWA) ET FCM (natif).
+   * Identique à la logique de SosService.sendNotifications().
+   */
+  private async sendNotifications(
+    tokens: string[],
+    payload: { title: string; body: string; data?: Record<string, string> },
+  ): Promise<void> {
+    if (tokens.length === 0) return;
+
+    const fcmTokens: string[] = [];
+    const webPushTokens: string[] = [];
+
+    for (const token of tokens) {
+      if (WebPushService.isWebPushToken(token)) {
+        webPushTokens.push(token);
+      } else {
+        fcmTokens.push(token);
+      }
+    }
+
+    // ── Web Push (PWA) ────────────────────────────────────────────────────
+    const expiredWebPush: string[] = [];
+    await Promise.all(
+      webPushTokens.map(async (token) => {
+        const sent = await this.webPush.sendNotification(token, {
+          title: payload.title,
+          body: payload.body,
+          data: payload.data,
+          requireInteraction: false,
+          vibrate: [200, 100, 200],
+        });
+        if (!sent) expiredWebPush.push(token);
+      }),
+    );
+
+    // Supprimer les subscriptions Web Push expirées
+    if (expiredWebPush.length > 0) {
+      await this.userModel.updateMany(
+        { token: { $in: expiredWebPush } },
+        { $pull: { token: { $in: expiredWebPush } } },
+      );
+      this.logger.log(`🗑 ${expiredWebPush.length} subscription(s) Web Push expirée(s) supprimée(s).`);
+    }
+
+    // ── FCM (Android natif) ───────────────────────────────────────────────
+    if (fcmTokens.length === 0) return;
+
     try {
-      await getMessaging().sendEachForMulticast({
-        tokens,
-        notification: {
-          title: 'AlertProche - Réponse à votre invitation',
-          body: msg,
-        },
-        data: {
-          type: 'TRUSTED_CONTACT_RESPONSE',
-          action,
-          responderPseudo: responder.pseudo,
-        },
+      getMessaging();
+    } catch {
+      this.logger.error('Firebase Admin non initialisé - notifications FCM ignorées.');
+      return;
+    }
+
+    try {
+      const response = await getMessaging().sendEachForMulticast({
+        tokens: fcmTokens,
+        notification: { title: payload.title, body: payload.body },
+        data: payload.data || {},
         android: {
           priority: 'high',
-          notification: {
-            channelId: 'alertproche_notifications',
-            sound: 'default',
-          },
+          notification: { channelId: 'alertproche_notifications', sound: 'default' },
         },
         apns: {
           headers: { 'apns-priority': '10' },
           payload: { aps: { sound: 'default', badge: 1 } },
         },
       });
+
+      // Nettoyer les tokens FCM invalides
+      const invalidFcm: string[] = [];
+      response.responses.forEach((res, idx) => {
+        if (!res.success) {
+          const code = res.error?.code;
+          if (
+            code === 'messaging/invalid-registration-token' ||
+            code === 'messaging/registration-token-not-registered'
+          ) {
+            invalidFcm.push(fcmTokens[idx]);
+          }
+        }
+      });
+      if (invalidFcm.length > 0) {
+        await this.userModel.updateMany(
+          { token: { $in: invalidFcm } },
+          { $pull: { token: { $in: invalidFcm } } },
+        );
+        this.logger.log(`🗑 ${invalidFcm.length} token(s) FCM invalide(s) supprimé(s).`);
+      }
+
+      this.logger.log(`FCM contacts: ${response.successCount} succès / ${response.failureCount} échecs`);
     } catch (err: any) {
-      this.logger.error('Erreur notification réponse :', err?.message);
+      this.logger.error('Erreur FCM TrustedContacts:', err?.message);
     }
   }
 }

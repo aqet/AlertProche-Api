@@ -381,6 +381,8 @@ export class SosService {
     });
   }
 
+  //on peut faire du genre des quune notification est detecter alors le systeme lance le son
+
   // ── NOTIFICATIONS INTERNES ─────────────────────────────────────────────
 
   private async notifyTrustedContacts(
@@ -563,7 +565,7 @@ export class SosService {
           priority: 'high' as const,
           notification: {
             channelId: isSos ? 'alertproche_sos_channel' : 'alertproche_notifications',
-            sound: 'sos-alert',
+            sound: isSos ? 'alertsos' : 'default',
             priority: 'max' as const,
             visibility: 'public' as const,
             defaultSound: !isSos,
@@ -576,7 +578,7 @@ export class SosService {
           headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
           payload: {
             aps: {
-              sound: 'sos-alert',
+              sound: isSos ? 'alertsos' : 'default',
               badge: 1,
               'content-available': 1,
             },
