@@ -1,9 +1,12 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req, Query, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Request, Req, Query, UnauthorizedException, NotFoundException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { IsEmail, IsString, MinLength, MaxLength, Length } from 'class-validator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 
 class SendOtpDto {
   @IsEmail({}, { message: 'Email invalide.' })
@@ -46,7 +49,10 @@ class UpdateAccoumtDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Post('otp/send')
   sendOtp(@Body() dto: SendOtpDto) {
@@ -113,5 +119,34 @@ export class AuthController {
   searchUsers(@Query('q') q: string, @Req() req: any) {
     if (!q || q.trim().length < 2) return [];
     return this.authService.searchUsers(q.trim(), req.user._id.toString());
+  }
+
+  /** PATCH /auth/profile/photo - Mettre à jour la photo de profil */
+  @Patch('profile/photo')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('photo', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 Mo max
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowed.includes(file.mimetype)) {
+        return cb(new BadRequestException('Format non supporté. Acceptés : JPG, PNG, WebP.'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  async updatePhoto(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Fichier image manquant.');
+    const userId = req.user._id.toString();
+
+    // Upload vers Cloudinary dossier avatars
+    const photoUrl = await this.cloudinary.uploadAvatar(file.buffer, file.originalname, userId);
+
+    // Mettre à jour en base et retourner le user mis à jour
+    const user = await this.authService.updatePhoto(userId, photoUrl);
+    return { photoUrl, user };
   }
 }

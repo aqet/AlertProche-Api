@@ -24,6 +24,42 @@ export class CloudinaryService {
   }
 
   /**
+   * Upload une photo de profil (avatar) vers Cloudinary.
+   * Optimisé : carré 300x300, WebP, qualité auto → dossier avatars.
+   * Remplace l'ancienne photo si elle existait.
+   */
+  async uploadAvatar(buffer: Buffer, filename: string, userId: string): Promise<string> {
+    if (!this.isConfigured) {
+      throw new InternalServerErrorException('Cloudinary non configuré.');
+    }
+
+    const publicId = `alertproche/avatars/${userId}`;
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          public_id:     publicId,
+          overwrite:     true,          // remplace l'avatar précédent
+          resource_type: 'image',
+          folder:        'alertproche/avatars',
+          format:        'webp',
+          transformation: [
+            { width: 300, height: 300, crop: 'fill', gravity: 'face' },
+            { quality: 'auto' },
+          ],
+          allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        },
+        (error, result: UploadApiResponse | undefined) => {
+          if (error) return reject(new InternalServerErrorException(`Avatar upload error: ${error.message}`));
+          if (!result) return reject(new InternalServerErrorException('Cloudinary: pas de résultat'));
+          resolve(result.secure_url);
+        },
+      );
+      streamifier.createReadStream(buffer).pipe(uploadStream);
+    });
+  }
+
+  /**
    * Upload un média du feed (image ou vidéo) avec optimisation dédiée.
    * Retourne l'URL sécurisée ET les métadonnées Cloudinary pour suppression fiable.
    */

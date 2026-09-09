@@ -10,6 +10,7 @@ import { Model, Types } from 'mongoose';
 import { FeedPost, FeedPostDocument } from './feed-post.schema';
 import { CreateFeedPostDto } from './dto/create-feed-post.dto';
 import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
+import { User, UserDocument } from '../schemas/user.schema';
 
 @Injectable()
 export class FeedService {
@@ -17,10 +18,11 @@ export class FeedService {
 
   constructor(
     @InjectModel(FeedPost.name) private feedModel: Model<FeedPostDocument>,
+    @InjectModel(User.name)     private userModel:  Model<UserDocument>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
-  /** Récupérer le feed paginé (du plus récent au plus ancien) */
+  /** Récupérer le feed paginé avec la photoUrl à jour de chaque auteur */
   async getFeed(page = 1, limit = 10): Promise<{
     posts: any[];
     total: number;
@@ -28,23 +30,43 @@ export class FeedService {
     totalPages: number;
     hasMore: boolean;
   }> {
-    const skip = (page - 1) * limit;
-    const safeLimit = Math.min(limit, 50); // max 50 par appel
+    const skip      = (page - 1) * limit;
+    const safeLimit = Math.min(limit, 50);
 
-    const [posts, total] = await Promise.all([
-      this.feedModel
-        .find({ isVisible: true })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(safeLimit)
-        .lean(),
+    const [result, total] = await Promise.all([
+      this.feedModel.aggregate([
+        { $match: { isVisible: true } },
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: safeLimit },
+        // Jointure pour récupérer la photoUrl actuelle de l'auteur
+        {
+          $lookup: {
+            from:         'users',
+            localField:   'author.userId',
+            foreignField: '_id',
+            as:           '_authorDoc',
+          },
+        },
+        {
+          $addFields: {
+            'author.photoUrl': {
+              $ifNull: [
+                { $arrayElemAt: ['$_authorDoc.photoUrl', 0] },
+                '$author.photoUrl',  // fallback sur la valeur stockée
+              ],
+            },
+          },
+        },
+        { $unset: '_authorDoc' },
+      ]),
       this.feedModel.countDocuments({ isVisible: true }),
     ]);
 
     const totalPages = Math.ceil(total / safeLimit);
 
     return {
-      posts: posts,
+      posts: result,
       total,
       page,
       totalPages,
