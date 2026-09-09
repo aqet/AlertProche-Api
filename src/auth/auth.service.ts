@@ -197,6 +197,15 @@ export class AuthService {
     };
   }
 
+  /** Mettre à jour la photo de profil */
+  async updatePhoto(userId: string, photoUrl: string): Promise<any> {
+    const user = await this.userModel
+      .findByIdAndUpdate(userId, { photoUrl }, { new: true })
+      .select('-password');
+    if (!user) throw new NotFoundException('Utilisateur introuvable.');
+    return user;
+  }
+
   async registerFcmToken(userId: string, token: string): Promise<User> {
     return this.userModel.findByIdAndUpdate(
       userId,

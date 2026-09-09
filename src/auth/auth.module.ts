@@ -9,6 +9,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { User, UserSchema } from '../schemas/user.schema';
 import { Otp, OtpSchema } from '../schemas/otp.schema';
 import { MailModule } from '../mail/mail.module';
+import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MailModule } from '../mail/mail.module';
       { name: Otp.name,  schema: OtpSchema  },
     ]),
     MailModule,
+    CloudinaryModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
