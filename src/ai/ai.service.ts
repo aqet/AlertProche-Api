@@ -368,4 +368,41 @@ Si une information est absente ou incertaine, indique null pour ce champ.`;
       throw new InternalServerErrorException("Impossible d'analyser l'empreinte visuelle de l'image.");
   }
   }
+
+  /**
+   * Génère une réponse de chat avec le contexte conversationnel.
+   * Utilisé par le chatbot assistant AlertProche.
+   */
+  async generateChatResponse(
+    contents: { role: string; parts: { text: string }[] }[],
+    systemInstruction: string,
+  ): Promise<string> {
+    const chatModels = [
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-2.0-flash',
+    ];
+
+    for (const model of chatModels) {
+      try {
+        console.log(`[CHAT] Tentative avec le modèle : ${model}`);
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: contents as any,
+          config: { systemInstruction },
+        });
+        const text = response.text ?? '';
+        if (text) {
+          console.log(`✅ Chat réponse via ${model}`);
+          return text;
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ Chat échec ${model}: ${err?.message}`);
+      }
+    }
+
+    console.error('❌ Tous les modèles chat ont échoué.');
+    return '';
+  }
 }

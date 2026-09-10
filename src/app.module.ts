@@ -13,6 +13,7 @@ import { SosModule } from './sos/sos.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { VersionsModule } from './versions/versions.module';
 import { FeedModule } from './feed/feed.module';
+import { ChatModule } from './chat/chat.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -47,6 +48,7 @@ import { AppService } from './app.service';
     SosModule,
     VersionsModule,
     FeedModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService]
