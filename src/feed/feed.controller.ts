@@ -56,6 +56,12 @@ export class FeedController {
     return this.feedService.getFeed(page, limit);
   }
 
+  /** GET /feed/:id — récupérer un seul post (page de détail) */
+  @Get(':id')
+  getPostById(@Param('id') id: string) {
+    return this.feedService.getPostById(id);
+  }
+
   /** POST /feed — créer un post avec médias optionnels */
   @Post()
   @UseGuards(JwtAuthGuard)

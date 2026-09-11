@@ -1,11 +1,11 @@
 import { Controller, Get, Param, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { PostsService } from '../posts/posts.service';
+import { FeedService } from '../feed/feed.service';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://alertproche.com';
 const SITE_NAME    = 'AlertProche';
-const SITE_SLOGAN  = 'Protéger les personnes vulnérables, c\'est l\'affaire de tous.';
-const FALLBACK_IMG = `${FRONTEND_URL}/favicon.ico`;
+const FALLBACK_IMG = `${FRONTEND_URL}/icons/web-app-manifest-192x192.png`;
 
 const TYPE_EMOJI: Record<string, string> = {
   'Disparition':    '🚨',
@@ -16,7 +16,10 @@ const TYPE_EMOJI: Record<string, string> = {
 
 @Controller('share')
 export class ShareController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly feedService:  FeedService,
+  ) {}
 
   /**
    * GET /share/posts/:id
@@ -104,5 +107,94 @@ export class ShareController {
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * GET /share/feed/:id
+   * Partage d'un post du fil d'actualité avec meta OG.
+   */
+  @Get('feed/:id')
+  async shareFeedPost(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const post     = await this.feedService.getPostById(id);
+      const postUrl  = `${FRONTEND_URL}/feed/${id}`;
+      const shareUrl = `${process.env.API_URL || 'https://api.alertproche.com'}/share/feed/${id}`;
+
+      // Image : première image du post, sinon fallback
+      const image = (post.mediaType === 'image' || post.mediaType === 'mixed') && post.mediaUrls?.length > 0
+        ? post.mediaUrls[0]
+        : FALLBACK_IMG;
+
+      const authorName = post.author?.pseudo || 'Communauté AlertProche';
+      const textPreview = (post.content || '').slice(0, 200).replace(/\n/g, ' ');
+      const title       = textPreview
+        ? `${authorName} sur AlertProche`
+        : `Publication de ${authorName}`;
+      const description = textPreview
+        ? `${textPreview}${post.content?.length > 200 ? '…' : ''}`
+        : `Découvrez cette publication sur AlertProche.`;
+      const hasImage    = image !== FALLBACK_IMG;
+
+      const safeTitle    = this.escape(title);
+      const safeDesc     = this.escape(description);
+      const safeImage    = this.escape(image);
+      const safePostUrl  = this.escape(postUrl);
+      const safeShareUrl = this.escape(shareUrl);
+      const safeAuthor   = this.escape(authorName);
+
+      const html = `<!DOCTYPE html>
+<html lang="fr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="UTF-8">
+  <title>${safeTitle} - ${SITE_NAME}</title>
+
+  <!-- ── Open Graph ─────────────────────────────────── -->
+  <meta property="og:type"         content="article">
+  <meta property="og:site_name"    content="${SITE_NAME}">
+  <meta property="og:title"        content="${safeTitle}">
+  <meta property="og:description"  content="${safeDesc}">
+  <meta property="og:image"        content="${safeImage}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt"    content="${safeTitle}">
+  <meta property="og:url"          content="${safePostUrl}">
+  <meta property="og:locale"       content="fr_CM">
+  <meta property="article:author"  content="${safeAuthor}">
+
+  <!-- ── Twitter Card ──────────────────────────────── -->
+  <meta name="twitter:card"        content="${hasImage ? 'summary_large_image' : 'summary'}">
+  <meta name="twitter:site"        content="@AlertProche">
+  <meta name="twitter:title"       content="${safeTitle}">
+  <meta name="twitter:description" content="${safeDesc}">
+  <meta name="twitter:image"       content="${safeImage}">
+
+  <!-- ── SEO ───────────────────────────────────────── -->
+  <meta name="description"         content="${safeDesc}">
+  <meta name="robots"              content="noindex, follow">
+
+  <!-- ── Redirection navigateurs ───────────────────── -->
+  <meta http-equiv="refresh" content="0; url=${safePostUrl}">
+  <link rel="canonical" href="${safePostUrl}">
+
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0a0f1e; color: #fff;
+           display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; margin: 0; }
+    a    { color: #00d4aa; }
+  </style>
+</head>
+<body>
+  <p>Redirection en cours… <a href="${safePostUrl}">Cliquez ici</a> si rien ne se passe.</p>
+  <script>window.location.replace(${JSON.stringify(postUrl)});</script>
+</body>
+</html>`;
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      res.status(200).send(html);
+
+    } catch {
+      res.redirect(302, `${FRONTEND_URL}/feed`);
+    }
   }
 }

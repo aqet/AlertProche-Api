@@ -179,6 +179,29 @@ export class FeedService {
     return { liked: !alreadyLiked, likesCount: Math.max(0, updated?.likesCount ?? 0) };
   }
 
+  /** Récupérer un post par ID avec photoUrl à jour (pour partage OG et page détail) */
+  async getPostById(postId: string): Promise<any> {
+    const results = await this.feedModel.aggregate([
+      { $match: { _id: new Types.ObjectId(postId), isVisible: true } },
+      { $limit: 1 },
+      {
+        $lookup: {
+          from: 'users', localField: 'author.userId', foreignField: '_id', as: '_authorDoc',
+        },
+      },
+      {
+        $addFields: {
+          'author.photoUrl': {
+            $ifNull: [{ $arrayElemAt: ['$_authorDoc.photoUrl', 0] }, '$author.photoUrl'],
+          },
+        },
+      },
+      { $unset: '_authorDoc' },
+    ]);
+    if (!results || results.length === 0) throw new NotFoundException('Post introuvable.');
+    return results[0];
+  }
+
   /** Incrémenter le compteur de partages */
   async incrementShares(postId: string): Promise<void> {
     await this.feedModel.findByIdAndUpdate(postId, { $inc: { sharesCount: 1 } });
