@@ -43,16 +43,22 @@ export class PaymentController {
   private async resolveCustomer(userId: string | undefined, phone: string) {
     const defaultEmail = process.env.DIGIKUNTZ_DEFAULT_EMAIL ?? 'contact@alertproche.com';
     if (userId) {
-      const user = await this.userModel.findById(userId).lean();
-      if (user) {
-        return {
-          userEmail: user.email,
-          userPhone: phone,
-          userCountry: 'Cameroon',
-          senderName: user.pseudo,
-        };
+      try {
+        const user = await this.userModel.findById(userId).lean();
+        this.logger.log(`[resolveCustomer] userId=${userId} found=${!!user} email=${user?.email}`);
+        if (user) {
+          return {
+            userEmail: user.email,
+            userPhone: phone,
+            userCountry: 'Cameroon',
+            senderName: user.pseudo,
+          };
+        }
+      } catch (e: any) {
+        this.logger.warn(`[resolveCustomer] findById failed for userId=${userId}: ${e?.message}`);
       }
     }
+    this.logger.warn(`[resolveCustomer] userId=${userId} → fallback email=${defaultEmail}`);
     return {
       userEmail: defaultEmail,
       userPhone: phone,

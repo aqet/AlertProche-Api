@@ -44,21 +44,23 @@ export class DigikuntzService {
     const url = `${this.baseUrl}/transaction`;
     this.logger.log(`[digiKUNTZ] createTransaction ${params.amount} XAF – ${params.raisonForTransfer}`);
 
+    const payload = {
+      estimation:        params.amount,
+      raisonForTransfer: params.raisonForTransfer,
+      callbackUrl:       params.callbackUrl,
+      customer: {
+        email:   params.userEmail,
+        phone:   params.userPhone,
+        country: params.userCountry,
+        name:    params.senderName,
+      },
+    };
+    this.logger.log(`[digiKUNTZ] payload → ${JSON.stringify(payload)}`);
+    this.logger.log(`[digiKUNTZ] headers → x-user-id="${this.userId}" x-secret-key="${this.secretKey ? '***' : '(empty)'}"`);
+
     try {
       const res: AxiosResponse<Record<string, any>> = await firstValueFrom(
-        this.http.post<Record<string, any>>(
-          url,
-          {
-            estimation: params.amount,
-            raisonForTransfer: params.raisonForTransfer,
-            callbackUrl: params.callbackUrl,
-            userEmail: params.userEmail,
-            userPhone: params.userPhone,
-            userCountry: params.userCountry,
-            senderName: params.senderName,
-          },
-          { headers: this.headers },
-        ),
+        this.http.post<Record<string, any>>(url, payload, { headers: this.headers }),
       );
 
       const data = res.data;
