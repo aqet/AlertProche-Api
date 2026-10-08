@@ -276,7 +276,7 @@ Réponds UNIQUEMENT avec un objet JSON : {"valid": true|false, "normalizedName":
 
   /**
    * Analyse un buffer audio et extrait les données pour pré-remplir le formulaire d'alerte.
-   * L'audio est traité uniquement en mémoire — aucun fichier n'est créé sur le disque.
+   * L'audio est traité uniquement en mémoire - aucun fichier n'est créé sur le disque.
    */
   async parseAudioToForm(audioBuffer: Buffer, mimeType: string): Promise<ParsedAudioAlertDto> {
     const FALLBACK: ParsedAudioAlertDto = {
@@ -336,7 +336,7 @@ Si une information est absente ou incertaine, indique null pour ce champ.`;
       }
     }
 
-    console.error('❌ Tous les modèles audio ont échoué — retour du fallback vide.');
+    console.error('❌ Tous les modèles audio ont échoué - retour du fallback vide.');
     return FALLBACK;
   }
 

@@ -98,7 +98,7 @@ export class ChatService {
     };
   }
 
-  /** Message visiteur non connecté — pas de stockage en base, rate limit par IP */
+  /** Message visiteur non connecté - pas de stockage en base, rate limit par IP */
   async sendGuestMessage(ip: string, dto: SendMessageDto): Promise<ChatResponse> {
     // Rate limit par IP (5 req/min pour les visiteurs)
     const key   = `guest:${ip}`;
@@ -123,7 +123,7 @@ export class ChatService {
     // Incrémenter le compteur de messages invités
     this.incrementStats({ totalGuestMessages: 1 }).catch(() => {});
 
-    // Pas d'historique pour les visiteurs — contexte vide
+    // Pas d'historique pour les visiteurs - contexte vide
     const contents = [{ role: 'user', parts: [{ text: dto.message }] }];
 
     const systemGuest = SYSTEM_PROMPT.replace(

@@ -74,7 +74,7 @@ export class FeedService {
     };
   }
 
-  /** Créer un post (avec ou sans médias) — upload atomique */
+  /** Créer un post (avec ou sans médias) - upload atomique */
   async createPost(
     dto: CreateFeedPostDto,
     user: { _id: string; pseudo: string; photoUrl?: string },
@@ -153,7 +153,7 @@ export class FeedService {
     return post;
   }
 
-  /** Liker / Unliker un post — opérateurs atomiques MongoDB */
+  /** Liker / Unliker un post - opérateurs atomiques MongoDB */
   async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; likesCount: number }> {
     // Utiliser .lean() pour lire l'état actuel
     const post = await this.feedModel.findById(postId).lean();

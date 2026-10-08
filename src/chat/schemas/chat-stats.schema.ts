@@ -9,7 +9,7 @@ export type ChatStatsDocument = ChatStats & Document;
  */
 @Schema({ timestamps: true })
 export class ChatStats {
-  /** Clé singleton — toujours "global" */
+  /** Clé singleton - toujours "global" */
   @Prop({ type: String, default: 'global', unique: true })
   key: string;
 

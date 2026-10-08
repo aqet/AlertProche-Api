@@ -16,7 +16,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  /** POST /chat/message — utilisateur connecté, historique persisté */
+  /** POST /chat/message - utilisateur connecté, historique persisté */
   @Post('message')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -26,7 +26,7 @@ export class ChatController {
     return this.chatService.sendMessage(userId, userRole, dto);
   }
 
-  /** GET /chat/history/:threadId — récupérer l'historique au chargement */
+  /** GET /chat/history/:threadId - récupérer l'historique au chargement */
   @Get('history/:threadId')
   @UseGuards(JwtAuthGuard)
   getHistory(@Req() req: any) {
@@ -35,7 +35,7 @@ export class ChatController {
     return this.chatService.getHistory(userId, threadId);
   }
 
-  /** POST /chat/guest — visiteur non connecté, pas de stockage, rate limit IP */
+  /** POST /chat/guest - visiteur non connecté, pas de stockage, rate limit IP */
   @Post('guest')
   @HttpCode(HttpStatus.OK)
   sendGuestMessage(@Body() dto: SendMessageDto, @Req() req: any) {
@@ -44,7 +44,7 @@ export class ChatController {
     return this.chatService.sendGuestMessage(ip, dto);
   }
 
-  /** GET /chat/stats — statistiques d'utilisation du chatbot (Admin uniquement) */
+  /** GET /chat/stats - statistiques d'utilisation du chatbot (Admin uniquement) */
   @Get('stats')
   @UseGuards(JwtAuthGuard)
   getStats(@Req() req: any) {
