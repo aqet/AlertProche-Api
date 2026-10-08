@@ -48,6 +48,12 @@ export class DigikuntzService {
       estimation:        params.amount,
       raisonForTransfer: params.raisonForTransfer,
       callbackUrl:       params.callbackUrl,
+      // Format plat (documentation officielle digiKUNTZ)
+      userEmail:   params.userEmail,
+      userPhone:   params.userPhone,
+      userCountry: params.userCountry,
+      senderName:  params.senderName,
+      // Format imbriqué (indiqué dans les messages d'erreur digiKUNTZ)
       customer: {
         email:   params.userEmail,
         phone:   params.userPhone,
@@ -64,9 +70,13 @@ export class DigikuntzService {
       );
 
       const data = res.data;
+      this.logger.log(`[digiKUNTZ] response → ${JSON.stringify(data)}`);
+
+      // digiKUNTZ retourne les champs dans data.data (imbriqué)
+      const inner = data['data'] ?? data;
       return {
-        paymentLink:    data['paymentLink']    ?? data['payment_link']   ?? data['link'] ?? '',
-        transactionRef: data['transactionRef'] ?? data['transaction_ref'] ?? data['ref'] ?? `REF-${Date.now()}`,
+        paymentLink:    inner['paymentLink']    ?? inner['payment_link']   ?? inner['link'] ?? inner['url'] ?? '',
+        transactionRef: inner['transactionRef'] ?? inner['transaction_ref'] ?? inner['ref'] ?? data['id'] ?? `REF-${Date.now()}`,
       };
     } catch (err: any) {
       const status = err?.response?.status;
