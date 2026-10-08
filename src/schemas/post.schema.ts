@@ -38,6 +38,15 @@ export class Post {
 
   @Prop({ type: [String], default: [] })
   reportReasons: string[];
+
+  @Prop({ type: Number, required: false })
+  targetAmount?: number;
+
+  @Prop({ type: Number, default: 0 })
+  raisedAmount: number;
+
+  @Prop({ type: Number, default: 0 })
+  withdrawnAmount: number;
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
