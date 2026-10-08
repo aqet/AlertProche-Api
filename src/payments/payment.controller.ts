@@ -465,7 +465,7 @@ export class AdminPaymentController {
       this.logger.log(`Platform payout: ${tx._id} – ${amount} XAF`);
       return { message: 'Payout vers AlertProche effectué.', transactionId: tx._id, digikuntz: result };
     } catch (err: any) {
-      const tx = await this.transactionModel.create({
+      await this.transactionModel.create({
         transactionRef: `PLATFORM-PAYOUT-${Date.now()}`,
         amount,
         currency: 'XAF',
@@ -473,7 +473,9 @@ export class AdminPaymentController {
         status: 'PAYOUT_ERROR',
       });
       this.logger.error(`Platform payout failed: ${err?.message}`);
-      throw new BadRequestException(`Échec du payout: ${err?.message}`);
+      // Remonter le détail digiKUNTZ si disponible
+      const detail = err?.response?.digikuntzBody ?? err?.message;
+      throw new BadRequestException(`Échec du payout: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
     }
   }
 }

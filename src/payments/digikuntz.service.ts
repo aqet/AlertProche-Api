@@ -134,15 +134,12 @@ export class DigikuntzService {
       );
       return res.data as DigikuntzPayoutResponse;
     } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      this.logger.error(
-        `[digiKUNTZ] createPayout failed: status=${status ?? 'N/A'} message=${err?.message} body=${JSON.stringify(data)}`,
-      );
+      const digiBody = err?.response?.data ?? err?.message;
+      this.logger.error(`[digiKUNTZ] createPayout failed: status=${err?.response?.status} body=${JSON.stringify(digiBody)}`);
       throw new InternalServerErrorException({
         message: 'Erreur lors du payout digiKUNTZ.',
-        digikuntzStatus: status,
-        digikuntzBody: data,
+        digikuntzStatus: err?.response?.status,
+        digikuntzBody: digiBody,
       });
     }
   }
