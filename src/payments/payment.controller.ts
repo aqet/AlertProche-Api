@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Body,
+  Query,
   UseGuards,
   Request,
   Logger,
@@ -76,9 +77,9 @@ export class PaymentController {
     @Body() body: { alertId: string; amount: number; userId?: string; phone: string },
   ) {
     const { alertId, amount, userId, phone } = body;
-
-    if (!alertId || !amount || amount < 100) {
-      throw new BadRequestException('alertId et amount (min 100) sont requis.');
+// ici
+    if (!alertId || !amount || amount < 15) {
+      throw new BadRequestException('alertId et amount (min 15) sont requis.');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -126,9 +127,9 @@ export class PaymentController {
     @Body() body: { amount: number; userId?: string; phone: string },
   ) {
     const { amount, userId, phone } = body;
-
-    if (!amount || amount < 100) {
-      throw new BadRequestException('amount (min 100) est requis.');
+// ici
+    if (!amount || amount < 15) {
+      throw new BadRequestException('amount (min 15) est requis.');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -338,5 +339,63 @@ export class AdminPaymentController {
       this.logger.error(`Payout failed: ${err?.message}`);
       throw new BadRequestException(`Échec du payout : ${err?.message}`);
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /admin/payments/transactions
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('transactions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  async getTransactions(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+  ) {
+    const filter: Record<string, any> = {};
+    if (type)   filter['type']   = type;
+    if (status) filter['status'] = status;
+    return this.transactionModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /admin/payments/payout-requests
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('payout-requests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  async getPayoutRequests() {
+    return this.transactionModel
+      .find({ type: 'PAYOUT_REQUEST' })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // POST /admin/payments/mark-success/:transactionId  (récupération manuelle)
+  // ──────────────────────────────────────────────────────────────────────
+  @Post('mark-success/:transactionId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  @HttpCode(HttpStatus.OK)
+  async markTransactionSuccess(@Param('transactionId') transactionId: string) {
+    const tx = await this.transactionModel.findById(transactionId);
+    if (!tx) throw new NotFoundException('Transaction introuvable.');
+    if (tx.status === 'SUCCESS') return { message: 'Déjà marquée SUCCESS.' };
+
+    tx.status = 'SUCCESS';
+    await tx.save();
+
+    if (tx.type === 'DONATION_ALERT' && tx.alertId) {
+      await this.postModel.findByIdAndUpdate(tx.alertId, {
+        $inc: { raisedAmount: tx.amount },
+      });
+      this.logger.log(`[manual] raisedAmount updated for alert ${tx.alertId} +${tx.amount}`);
+    }
+
+    return { message: 'Transaction marquée SUCCESS.', transactionId: tx._id };
   }
 }
