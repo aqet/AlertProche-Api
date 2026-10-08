@@ -82,8 +82,8 @@ export class PaymentController {
     if (!alertId) {
       throw new BadRequestException('alertId est requis.');
     }
-    if (!Number.isFinite(parsedAmount) || parsedAmount < 15) {
-      throw new BadRequestException('Le montant doit être un nombre positif (minimum 15 XAF).');
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 100) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 100 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -133,8 +133,8 @@ export class PaymentController {
     const { amount, userId, phone } = body;
 
     const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount < 15) {
-      throw new BadRequestException('Le montant doit être un nombre positif (minimum 15 XAF).');
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 100) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 100 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');

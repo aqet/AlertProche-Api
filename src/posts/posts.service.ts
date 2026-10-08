@@ -415,6 +415,78 @@ export class PostsService {
     };
   }
 
+  async resolvePost(id: string, user: any) {
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
+    const post = await this.postModel.findById(id);
+    if (!post) throw new NotFoundException('Publication introuvable.');
+
+    const isAdminOrMod = ['Admin', 'Moderateur'].includes(user.role);
+    if (post.isAnonymous === true && !isAdminOrMod) {
+      throw new ForbiddenException(
+        'Seul un administrateur ou modérateur peut résoudre une alerte anonyme.',
+      );
+    }
+    if (
+      post.isAnonymous !== true &&
+      !isAdminOrMod &&
+      post.author_id.toString() !== user._id.toString()
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez résoudre que vos propres publications.',
+      );
+    }
+
+    const updated = await this.postModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            isResolved: true,
+            resolvedAt: new Date(),
+            resolvedBy: user.pseudo ?? user._id.toString(),
+          },
+        },
+        { new: true },
+      )
+      .lean();
+
+    return this.enrichPost(updated!);
+  }
+
+  async unresolvePost(id: string, user: any) {
+    if (!Types.ObjectId.isValid(id))
+      throw new NotFoundException('Publication introuvable.');
+    const post = await this.postModel.findById(id);
+    if (!post) throw new NotFoundException('Publication introuvable.');
+
+    const isAdminOrMod = ['Admin', 'Moderateur'].includes(user.role);
+    if (post.isAnonymous === true && !isAdminOrMod) {
+      throw new ForbiddenException(
+        'Seul un administrateur ou modérateur peut réouvrir une alerte anonyme.',
+      );
+    }
+    if (
+      post.isAnonymous !== true &&
+      !isAdminOrMod &&
+      post.author_id.toString() !== user._id.toString()
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez réouvrir que vos propres publications.',
+      );
+    }
+
+    const updated = await this.postModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { isResolved: false, resolvedAt: null, resolvedBy: null } },
+        { new: true },
+      )
+      .lean();
+
+    return this.enrichPost(updated!);
+  }
+
   async clearReport(id: string, user: any) {
     if (!['Moderateur', 'Admin'].includes(user.role)) {
       throw new ForbiddenException('Permissions insuffisantes.');
@@ -486,6 +558,9 @@ export class PostsService {
       reportReasons: post.reportReasons,
       createdAt: post.createdAt,
       commentCount,
+      isResolved: post.isResolved ?? false,
+      resolvedAt: post.resolvedAt ?? null,
+      resolvedBy: post.resolvedBy ?? null,
     };
   }
 }
