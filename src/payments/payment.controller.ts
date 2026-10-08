@@ -78,8 +78,8 @@ export class PaymentController {
   ) {
     const { alertId, amount, userId, phone } = body;
 // ici
-    if (!alertId || !amount || amount < 15) {
-      throw new BadRequestException('alertId et amount (min 15) sont requis.');
+    if (!alertId || !amount || amount < 1) {
+      throw new BadRequestException('alertId et amount (min 1) sont requis.');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -128,8 +128,8 @@ export class PaymentController {
   ) {
     const { amount, userId, phone } = body;
 // ici
-    if (!amount || amount < 15) {
-      throw new BadRequestException('amount (min 15) est requis.');
+    if (!amount || amount < 1) {
+      throw new BadRequestException('amount (min 1) est requis.');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -280,6 +280,27 @@ export class PaymentController {
       availableAmount: (p.raisedAmount ?? 0) - (p.withdrawnAmount ?? 0),
     }));
   }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /payments/my-transactions  (auth requis)
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('my-transactions')
+  @UseGuards(JwtAuthGuard)
+  async getMyTransactions(@Request() req: any) {
+    const userId = req.user._id ?? req.user.userId;
+    const myPosts = await this.postModel.find({ author_id: new Types.ObjectId(userId) }).select('_id').lean();
+    const alertIds = myPosts.map((p: any) => p._id);
+    return this.transactionModel
+      .find({
+        $or: [
+          { userId: new Types.ObjectId(userId) },
+          { alertId: { $in: alertIds } },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -350,10 +371,12 @@ export class AdminPaymentController {
   async getTransactions(
     @Query('type') type?: string,
     @Query('status') status?: string,
+    @Query('userId') userId?: string,
   ) {
     const filter: Record<string, any> = {};
     if (type)   filter['type']   = type;
     if (status) filter['status'] = status;
+    if (userId) filter['userId'] = new Types.ObjectId(userId);
     return this.transactionModel
       .find(filter)
       .sort({ createdAt: -1 })
@@ -397,5 +420,60 @@ export class AdminPaymentController {
     }
 
     return { message: 'Transaction marquée SUCCESS.', transactionId: tx._id };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // POST /admin/payments/payout-to-platform
+  // ──────────────────────────────────────────────────────────────────────
+  @Post('payout-to-platform')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  @HttpCode(HttpStatus.OK)
+  async payoutToPlatform(
+    @Body() body: { amount: number; narration?: string },
+  ) {
+    const { amount, narration } = body;
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('amount est requis et doit être positif.');
+    }
+
+    const bankCode = process.env.PLATFORM_BANK_CODE ?? 'MTN';
+    const accountNumber = process.env.PLATFORM_ACCOUNT_NUMBER ?? '';
+    const accountName = process.env.PLATFORM_ACCOUNT_NAME ?? 'AlertProche';
+
+    if (!accountNumber) {
+      throw new BadRequestException('PLATFORM_ACCOUNT_NUMBER non configuré.');
+    }
+
+    try {
+      const result = await this.digikuntz.createPayout(
+        amount,
+        bankCode,
+        accountNumber,
+        accountName,
+        narration ?? `Retrait plateforme AlertProche – ${new Date().toISOString()}`,
+      );
+
+      const tx = await this.transactionModel.create({
+        transactionRef: `PLATFORM-PAYOUT-${Date.now()}`,
+        amount,
+        currency: 'XAF',
+        type: 'PAYOUT_REQUEST',
+        status: 'PAYOUT_SUCCESS',
+      });
+
+      this.logger.log(`Platform payout: ${tx._id} – ${amount} XAF`);
+      return { message: 'Payout vers AlertProche effectué.', transactionId: tx._id, digikuntz: result };
+    } catch (err: any) {
+      const tx = await this.transactionModel.create({
+        transactionRef: `PLATFORM-PAYOUT-${Date.now()}`,
+        amount,
+        currency: 'XAF',
+        type: 'PAYOUT_REQUEST',
+        status: 'PAYOUT_ERROR',
+      });
+      this.logger.error(`Platform payout failed: ${err?.message}`);
+      throw new BadRequestException(`Échec du payout: ${err?.message}`);
+    }
   }
 }
