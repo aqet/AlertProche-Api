@@ -77,9 +77,13 @@ export class PaymentController {
     @Body() body: { alertId: string; amount: number; userId?: string; phone: string },
   ) {
     const { alertId, amount, userId, phone } = body;
-// ici
-    if (!alertId || !amount || amount < 1) {
-      throw new BadRequestException('alertId et amount (min 1) sont requis.');
+
+    const parsedAmount = Number(amount);
+    if (!alertId) {
+      throw new BadRequestException('alertId est requis.');
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 15) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 15 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -94,7 +98,7 @@ export class PaymentController {
     const customer = await this.resolveCustomer(userId, phone);
 
     const { paymentLink, transactionRef } = await this.digikuntz.createTransaction({
-      amount,
+      amount: parsedAmount,
       raisonForTransfer: `Don pour l'alerte : ${alert.title}`,
       callbackUrl,
       userEmail: customer.userEmail,
@@ -107,7 +111,7 @@ export class PaymentController {
       userId: userId ? new Types.ObjectId(userId) : undefined,
       alertId: new Types.ObjectId(alertId),
       transactionRef,
-      amount,
+      amount: parsedAmount,
       currency: 'XAF',
       type: 'DONATION_ALERT',
       status: 'PENDING',
@@ -127,9 +131,10 @@ export class PaymentController {
     @Body() body: { amount: number; userId?: string; phone: string },
   ) {
     const { amount, userId, phone } = body;
-// ici
-    if (!amount || amount < 1) {
-      throw new BadRequestException('amount (min 1) est requis.');
+
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 15) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 15 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -141,7 +146,7 @@ export class PaymentController {
     const customer = await this.resolveCustomer(userId, phone);
 
     const { paymentLink, transactionRef } = await this.digikuntz.createTransaction({
-      amount,
+      amount: parsedAmount,
       raisonForTransfer: 'Soutien à la plateforme AlertProche',
       callbackUrl,
       userEmail: customer.userEmail,
@@ -153,7 +158,7 @@ export class PaymentController {
     const tx = await this.transactionModel.create({
       userId: userId ? new Types.ObjectId(userId) : undefined,
       transactionRef,
-      amount,
+      amount: parsedAmount,
       currency: 'XAF',
       type: 'PLATFORM_SUPPORT',
       status: 'PENDING',
@@ -183,8 +188,27 @@ export class PaymentController {
   ) {
     const { alertId, amount, accountBankCode, accountNumber, receiverName } = body;
 
-    if (!alertId || !amount || !accountBankCode || !accountNumber || !receiverName) {
+    // ── Validation stricte des champs ────────────────────────────────────
+    if (!alertId || !accountBankCode || !accountNumber || !receiverName) {
       throw new BadRequestException('Tous les champs sont requis.');
+    }
+
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 1 XAF).');
+    }
+
+    if (!['MTN', 'ORANGEMONEY'].includes(accountBankCode)) {
+      throw new BadRequestException('Opérateur invalide. Valeurs acceptées : MTN, ORANGEMONEY.');
+    }
+
+    // Format international Cameroun : 237 suivi de 9 chiffres
+    if (!/^237[0-9]{9}$/.test(accountNumber.trim())) {
+      throw new BadRequestException('Numéro de compte invalide. Format attendu : 237XXXXXXXXX (12 chiffres).');
+    }
+
+    if (typeof receiverName !== 'string' || receiverName.trim().length < 2) {
+      throw new BadRequestException('Nom du titulaire invalide (minimum 2 caractères).');
     }
 
     const alert = await this.postModel.findById(alertId).lean();
@@ -196,24 +220,31 @@ export class PaymentController {
       throw new BadRequestException("Vous n'êtes pas l'auteur de cette alerte.");
     }
 
-    const availableAmount = (alert.raisedAmount ?? 0) - (alert.withdrawnAmount ?? 0);
-    if (amount > availableAmount) {
+    // ── Vérification du solde disponible (source de vérité = DB) ────────
+    const raisedAmount    = Number(alert.raisedAmount   ?? 0);
+    const withdrawnAmount = Number(alert.withdrawnAmount ?? 0);
+    const availableAmount = raisedAmount - withdrawnAmount;
+
+    if (availableAmount <= 0) {
+      throw new BadRequestException('Aucun solde disponible pour cette alerte.');
+    }
+    if (parsedAmount > availableAmount) {
       throw new BadRequestException(
-        `Montant demandé supérieur au disponible (${availableAmount} XAF).`,
+        `Montant demandé (${parsedAmount} XAF) supérieur au solde disponible (${availableAmount} XAF).`,
       );
     }
 
     const tx = await this.transactionModel.create({
-      userId: new Types.ObjectId(userId),
-      alertId: new Types.ObjectId(alertId),
-      transactionRef: `PAYOUT-${Date.now()}-${userId}`,
-      amount,
-      currency: 'XAF',
-      type: 'PAYOUT_REQUEST',
-      status: 'PAYOUT_PENDING',
-      accountBankCode,
-      accountNumber,
-      receiverName,
+      userId:          new Types.ObjectId(userId),
+      alertId:         new Types.ObjectId(alertId),
+      transactionRef:  `PAYOUT-${Date.now()}-${userId}`,
+      amount:          parsedAmount,
+      currency:        'XAF',
+      type:            'PAYOUT_REQUEST',
+      status:          'PAYOUT_PENDING',
+      accountBankCode: accountBankCode.trim(),
+      accountNumber:   accountNumber.trim(),
+      receiverName:    receiverName.trim(),
     });
 
     this.logger.log(`Payout requested: ${tx._id} – ${amount} XAF for alert ${alertId}`);
