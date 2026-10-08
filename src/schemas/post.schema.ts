@@ -47,6 +47,15 @@ export class Post {
 
   @Prop({ type: Number, default: 0 })
   withdrawnAmount: number;
+
+  @Prop({ default: false })
+  isResolved: boolean;
+
+  @Prop({ type: Date, default: null })
+  resolvedAt: Date;
+
+  @Prop({ type: String, default: null })
+  resolvedBy: string;
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
@@ -56,3 +65,4 @@ PostSchema.index({ location: 1 });
 PostSchema.index({ createdAt: -1 });
 PostSchema.index({ isActive: 1 });
 PostSchema.index({ isReported: 1 });
+PostSchema.index({ isResolved: 1 });

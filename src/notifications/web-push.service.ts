@@ -6,9 +6,9 @@ import * as webpush from 'web-push';
  * Utilisé pour envoyer des notifications aux navigateurs web et PWA installées.
  *
  * Configuration VAPID requise dans les variables d'environnement :
- *   VAPID_PUBLIC_KEY  — Clé publique VAPID (partagée avec le frontend)
- *   VAPID_PRIVATE_KEY — Clé privée VAPID (strictement backend)
- *   VAPID_SUBJECT     — URL ou mailto: du propriétaire du serveur
+ *   VAPID_PUBLIC_KEY  - Clé publique VAPID (partagée avec le frontend)
+ *   VAPID_PRIVATE_KEY - Clé privée VAPID (strictement backend)
+ *   VAPID_SUBJECT     - URL ou mailto: du propriétaire du serveur
  *
  * Générer les clés : npx web-push generate-vapid-keys
  */
@@ -27,7 +27,7 @@ export class WebPushService {
     const subject    = process.env.VAPID_SUBJECT || 'mailto:contact@alertproche.com';
 
     if (!publicKey || !privateKey) {
-      this.logger.warn('VAPID_PUBLIC_KEY ou VAPID_PRIVATE_KEY manquant — Web Push désactivé.');
+      this.logger.warn('VAPID_PUBLIC_KEY ou VAPID_PRIVATE_KEY manquant - Web Push désactivé.');
       return;
     }
 
@@ -89,7 +89,7 @@ export class WebPushService {
       await webpush.sendNotification(subscription, notificationPayload);
       return true;
     } catch (err: any) {
-      // 410 Gone = subscription expirée/révoquée — à supprimer de la DB
+      // 410 Gone = subscription expirée/révoquée - à supprimer de la DB
       if (err.statusCode === 410 || err.statusCode === 404) {
         this.logger.warn(`Subscription expirée (${err.statusCode}): ${subscription.endpoint.slice(-30)}`);
         return false; // Le caller supprimera ce token

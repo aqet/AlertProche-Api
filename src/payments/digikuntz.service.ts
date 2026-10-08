@@ -74,9 +74,31 @@ export class DigikuntzService {
 
       // digiKUNTZ retourne les champs dans data.data (imbriqué)
       const inner = data['data'] ?? data;
+      const paymentLink = inner['paymentLink'] ?? inner['payment_link'] ?? inner['link'] ?? inner['url'] ?? '';
+
+      // Extraire transactionRef depuis data.data d'abord, puis data directement
+      const transactionRef =
+        data['data']?.['transactionRef'] ??
+        data['data']?.['transaction_ref'] ??
+        data['data']?.['ref'] ??
+        data['transactionRef'] ??
+        data['transaction_ref'] ??
+        data['ref'] ??
+        data['id'];
+
+      this.logger.log(
+        `[digiKUNTZ] extracted transactionRef=${transactionRef} from data.data=${JSON.stringify(data['data'])}`,
+      );
+
+      if (!transactionRef) {
+        this.logger.warn(
+          `[digiKUNTZ] WARNING: transactionRef not found in response – using REF fallback. inner=${JSON.stringify(inner)} full=${JSON.stringify(data)}`,
+        );
+      }
+
       return {
-        paymentLink:    inner['paymentLink']    ?? inner['payment_link']   ?? inner['link'] ?? inner['url'] ?? '',
-        transactionRef: inner['transactionRef'] ?? inner['transaction_ref'] ?? inner['ref'] ?? data['id'] ?? `REF-${Date.now()}`,
+        paymentLink,
+        transactionRef: transactionRef ?? `REF-${Date.now()}`,
       };
     } catch (err: any) {
       const status = err?.response?.status;
@@ -112,15 +134,12 @@ export class DigikuntzService {
       );
       return res.data as DigikuntzPayoutResponse;
     } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      this.logger.error(
-        `[digiKUNTZ] createPayout failed: status=${status ?? 'N/A'} message=${err?.message} body=${JSON.stringify(data)}`,
-      );
+      const digiBody = err?.response?.data ?? err?.message;
+      this.logger.error(`[digiKUNTZ] createPayout failed: status=${err?.response?.status} body=${JSON.stringify(digiBody)}`);
       throw new InternalServerErrorException({
         message: 'Erreur lors du payout digiKUNTZ.',
-        digikuntzStatus: status,
-        digikuntzBody: data,
+        digikuntzStatus: err?.response?.status,
+        digikuntzBody: digiBody,
       });
     }
   }

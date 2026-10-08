@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Body,
+  Query,
   UseGuards,
   Request,
   Logger,
@@ -77,8 +78,12 @@ export class PaymentController {
   ) {
     const { alertId, amount, userId, phone } = body;
 
-    if (!alertId || !amount || amount < 100) {
-      throw new BadRequestException('alertId et amount (min 100) sont requis.');
+    const parsedAmount = Number(amount);
+    if (!alertId) {
+      throw new BadRequestException('alertId est requis.');
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 100) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 100 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -93,7 +98,7 @@ export class PaymentController {
     const customer = await this.resolveCustomer(userId, phone);
 
     const { paymentLink, transactionRef } = await this.digikuntz.createTransaction({
-      amount,
+      amount: parsedAmount,
       raisonForTransfer: `Don pour l'alerte : ${alert.title}`,
       callbackUrl,
       userEmail: customer.userEmail,
@@ -106,7 +111,7 @@ export class PaymentController {
       userId: userId ? new Types.ObjectId(userId) : undefined,
       alertId: new Types.ObjectId(alertId),
       transactionRef,
-      amount,
+      amount: parsedAmount,
       currency: 'XAF',
       type: 'DONATION_ALERT',
       status: 'PENDING',
@@ -127,8 +132,9 @@ export class PaymentController {
   ) {
     const { amount, userId, phone } = body;
 
-    if (!amount || amount < 100) {
-      throw new BadRequestException('amount (min 100) est requis.');
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 100) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 100 XAF).');
     }
     if (!phone || phone.replace(/\D/g, '').length < 8) {
       throw new BadRequestException('Un numéro de téléphone Mobile Money valide est requis.');
@@ -140,7 +146,7 @@ export class PaymentController {
     const customer = await this.resolveCustomer(userId, phone);
 
     const { paymentLink, transactionRef } = await this.digikuntz.createTransaction({
-      amount,
+      amount: parsedAmount,
       raisonForTransfer: 'Soutien à la plateforme AlertProche',
       callbackUrl,
       userEmail: customer.userEmail,
@@ -152,7 +158,7 @@ export class PaymentController {
     const tx = await this.transactionModel.create({
       userId: userId ? new Types.ObjectId(userId) : undefined,
       transactionRef,
-      amount,
+      amount: parsedAmount,
       currency: 'XAF',
       type: 'PLATFORM_SUPPORT',
       status: 'PENDING',
@@ -182,8 +188,27 @@ export class PaymentController {
   ) {
     const { alertId, amount, accountBankCode, accountNumber, receiverName } = body;
 
-    if (!alertId || !amount || !accountBankCode || !accountNumber || !receiverName) {
+    // ── Validation stricte des champs ────────────────────────────────────
+    if (!alertId || !accountBankCode || !accountNumber || !receiverName) {
       throw new BadRequestException('Tous les champs sont requis.');
+    }
+
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1) {
+      throw new BadRequestException('Le montant doit être un nombre positif (minimum 1 XAF).');
+    }
+
+    if (!['MTN', 'ORANGEMONEY'].includes(accountBankCode)) {
+      throw new BadRequestException('Opérateur invalide. Valeurs acceptées : MTN, ORANGEMONEY.');
+    }
+
+    // Format international Cameroun : 237 suivi de 9 chiffres
+    if (!/^237[0-9]{9}$/.test(accountNumber.trim())) {
+      throw new BadRequestException('Numéro de compte invalide. Format attendu : 237XXXXXXXXX (12 chiffres).');
+    }
+
+    if (typeof receiverName !== 'string' || receiverName.trim().length < 2) {
+      throw new BadRequestException('Nom du titulaire invalide (minimum 2 caractères).');
     }
 
     const alert = await this.postModel.findById(alertId).lean();
@@ -195,24 +220,31 @@ export class PaymentController {
       throw new BadRequestException("Vous n'êtes pas l'auteur de cette alerte.");
     }
 
-    const availableAmount = (alert.raisedAmount ?? 0) - (alert.withdrawnAmount ?? 0);
-    if (amount > availableAmount) {
+    // ── Vérification du solde disponible (source de vérité = DB) ────────
+    const raisedAmount    = Number(alert.raisedAmount   ?? 0);
+    const withdrawnAmount = Number(alert.withdrawnAmount ?? 0);
+    const availableAmount = raisedAmount - withdrawnAmount;
+
+    if (availableAmount <= 0) {
+      throw new BadRequestException('Aucun solde disponible pour cette alerte.');
+    }
+    if (parsedAmount > availableAmount) {
       throw new BadRequestException(
-        `Montant demandé supérieur au disponible (${availableAmount} XAF).`,
+        `Montant demandé (${parsedAmount} XAF) supérieur au solde disponible (${availableAmount} XAF).`,
       );
     }
 
     const tx = await this.transactionModel.create({
-      userId: new Types.ObjectId(userId),
-      alertId: new Types.ObjectId(alertId),
-      transactionRef: `PAYOUT-${Date.now()}-${userId}`,
-      amount,
-      currency: 'XAF',
-      type: 'PAYOUT_REQUEST',
-      status: 'PAYOUT_PENDING',
-      accountBankCode,
-      accountNumber,
-      receiverName,
+      userId:          new Types.ObjectId(userId),
+      alertId:         new Types.ObjectId(alertId),
+      transactionRef:  `PAYOUT-${Date.now()}-${userId}`,
+      amount:          parsedAmount,
+      currency:        'XAF',
+      type:            'PAYOUT_REQUEST',
+      status:          'PAYOUT_PENDING',
+      accountBankCode: accountBankCode.trim(),
+      accountNumber:   accountNumber.trim(),
+      receiverName:    receiverName.trim(),
     });
 
     this.logger.log(`Payout requested: ${tx._id} – ${amount} XAF for alert ${alertId}`);
@@ -279,6 +311,27 @@ export class PaymentController {
       availableAmount: (p.raisedAmount ?? 0) - (p.withdrawnAmount ?? 0),
     }));
   }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /payments/my-transactions  (auth requis)
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('my-transactions')
+  @UseGuards(JwtAuthGuard)
+  async getMyTransactions(@Request() req: any) {
+    const userId = req.user._id ?? req.user.userId;
+    const myPosts = await this.postModel.find({ author_id: new Types.ObjectId(userId) }).select('_id').lean();
+    const alertIds = myPosts.map((p: any) => p._id);
+    return this.transactionModel
+      .find({
+        $or: [
+          { userId: new Types.ObjectId(userId) },
+          { alertId: { $in: alertIds } },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -337,6 +390,123 @@ export class AdminPaymentController {
       await tx.save();
       this.logger.error(`Payout failed: ${err?.message}`);
       throw new BadRequestException(`Échec du payout : ${err?.message}`);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /admin/payments/transactions
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('transactions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  async getTransactions(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: string,
+  ) {
+    const filter: Record<string, any> = {};
+    if (type)   filter['type']   = type;
+    if (status) filter['status'] = status;
+    if (userId) filter['userId'] = new Types.ObjectId(userId);
+    return this.transactionModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // GET /admin/payments/payout-requests
+  // ──────────────────────────────────────────────────────────────────────
+  @Get('payout-requests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  async getPayoutRequests() {
+    return this.transactionModel
+      .find({ type: 'PAYOUT_REQUEST' })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // POST /admin/payments/mark-success/:transactionId  (récupération manuelle)
+  // ──────────────────────────────────────────────────────────────────────
+  @Post('mark-success/:transactionId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  @HttpCode(HttpStatus.OK)
+  async markTransactionSuccess(@Param('transactionId') transactionId: string) {
+    const tx = await this.transactionModel.findById(transactionId);
+    if (!tx) throw new NotFoundException('Transaction introuvable.');
+    if (tx.status === 'SUCCESS') return { message: 'Déjà marquée SUCCESS.' };
+
+    tx.status = 'SUCCESS';
+    await tx.save();
+
+    if (tx.type === 'DONATION_ALERT' && tx.alertId) {
+      await this.postModel.findByIdAndUpdate(tx.alertId, {
+        $inc: { raisedAmount: tx.amount },
+      });
+      this.logger.log(`[manual] raisedAmount updated for alert ${tx.alertId} +${tx.amount}`);
+    }
+
+    return { message: 'Transaction marquée SUCCESS.', transactionId: tx._id };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // POST /admin/payments/payout-to-platform
+  // ──────────────────────────────────────────────────────────────────────
+  @Post('payout-to-platform')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
+  @HttpCode(HttpStatus.OK)
+  async payoutToPlatform(
+    @Body() body: { amount: number; narration?: string },
+  ) {
+    const { amount, narration } = body;
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('amount est requis et doit être positif.');
+    }
+
+    const bankCode = process.env.PLATFORM_BANK_CODE ?? 'MTN';
+    const accountNumber = process.env.PLATFORM_ACCOUNT_NUMBER ?? '';
+    const accountName = process.env.PLATFORM_ACCOUNT_NAME ?? 'AlertProche';
+
+    if (!accountNumber) {
+      throw new BadRequestException('PLATFORM_ACCOUNT_NUMBER non configuré.');
+    }
+
+    try {
+      const result = await this.digikuntz.createPayout(
+        amount,
+        bankCode,
+        accountNumber,
+        accountName,
+        narration ?? `Retrait plateforme AlertProche – ${new Date().toISOString()}`,
+      );
+
+      const tx = await this.transactionModel.create({
+        transactionRef: `PLATFORM-PAYOUT-${Date.now()}`,
+        amount,
+        currency: 'XAF',
+        type: 'PAYOUT_REQUEST',
+        status: 'PAYOUT_SUCCESS',
+      });
+
+      this.logger.log(`Platform payout: ${tx._id} – ${amount} XAF`);
+      return { message: 'Payout vers AlertProche effectué.', transactionId: tx._id, digikuntz: result };
+    } catch (err: any) {
+      await this.transactionModel.create({
+        transactionRef: `PLATFORM-PAYOUT-${Date.now()}`,
+        amount,
+        currency: 'XAF',
+        type: 'PAYOUT_REQUEST',
+        status: 'PAYOUT_ERROR',
+      });
+      this.logger.error(`Platform payout failed: ${err?.message}`);
+      // Remonter le détail digiKUNTZ si disponible
+      const detail = err?.response?.digikuntzBody ?? err?.message;
+      throw new BadRequestException(`Échec du payout: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
     }
   }
 }

@@ -96,7 +96,7 @@ export class PostsController {
   @Post('parse-audio')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('audio', {
-    storage: memoryStorage(), // Uniquement en mémoire — aucun fichier sur le disque
+    storage: memoryStorage(), // Uniquement en mémoire - aucun fichier sur le disque
     limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo max
   }))
   async parseAudio(@UploadedFile() file: Express.Multer.File) {
@@ -108,7 +108,7 @@ export class PostsController {
     }
 
     const result = await this.aiService.parseAudioToForm(file.buffer, file.mimetype);
-    // Le buffer est libéré automatiquement par le GC — aucun stockage persistant
+    // Le buffer est libéré automatiquement par le GC - aucun stockage persistant
     return result;
   }
 
@@ -162,6 +162,18 @@ export class PostsController {
     // 💡 Ici, 'file.buffer' contient tes octets bruts (ex: <Buffer 89 50 4e 47...>)
     // On passe le buffer et le type (image/png) au service
     return this.postsService.searchSimilarImages(file.buffer, file.mimetype);
+  }
+
+  @Patch(':id/resolve')
+  @UseGuards(JwtAuthGuard)
+  resolvePost(@Param('id') id: string, @Request() req: any) {
+    return this.postsService.resolvePost(id, req.user);
+  }
+
+  @Patch(':id/unresolve')
+  @UseGuards(JwtAuthGuard)
+  unresolvePost(@Param('id') id: string, @Request() req: any) {
+    return this.postsService.unresolvePost(id, req.user);
   }
 
   @Patch(':id')

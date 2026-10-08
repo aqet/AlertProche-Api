@@ -56,13 +56,13 @@ export class FeedController {
     return this.feedService.getFeed(page, limit);
   }
 
-  /** GET /feed/:id — récupérer un seul post (page de détail) */
+  /** GET /feed/:id - récupérer un seul post (page de détail) */
   @Get(':id')
   getPostById(@Param('id') id: string) {
     return this.feedService.getPostById(id);
   }
 
-  /** POST /feed — créer un post avec médias optionnels */
+  /** POST /feed - créer un post avec médias optionnels */
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
@@ -91,7 +91,7 @@ export class FeedController {
     return this.feedService.createPost(dto, req.user, files ?? []);
   }
 
-  /** PATCH /feed/:id/like — liker / unliker */
+  /** PATCH /feed/:id/like - liker / unliker */
   @Patch(':id/like')
   @UseGuards(JwtAuthGuard)
   toggleLike(@Param('id') id: string, @Req() req: any) {
@@ -109,7 +109,7 @@ export class FeedController {
     );
   }
 
-  /** POST /feed/:id/share — incrémenter le compteur de partages */
+  /** POST /feed/:id/share - incrémenter le compteur de partages */
   @Post(':id/share')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -117,13 +117,13 @@ export class FeedController {
     return this.feedService.incrementShares(id);
   }
 
-  /** GET /feed/:id/comments — lire les commentaires */
+  /** GET /feed/:id/comments - lire les commentaires */
   @Get(':id/comments')
   getComments(@Param('id') id: string) {
     return this.feedService.getComments(id);
   }
 
-  /** POST /feed/:id/comments — créer un commentaire */
+  /** POST /feed/:id/comments - créer un commentaire */
   @Post(':id/comments')
   @UseGuards(JwtAuthGuard)
   addComment(
