@@ -6,6 +6,7 @@ import { Post, PostSchema } from '../schemas/post.schema';
 import { Comment, CommentSchema } from '../schemas/comment.schema';
 import { ModerationModule } from '../common/moderation/moderation.module';
 import { CloudinaryModule } from '../common/cloudinary/cloudinary.module';
+import { QdrantModule } from '../qdrant/qdrant.module';
 import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
@@ -26,6 +27,7 @@ import { User, UserSchema } from 'src/schemas/user.schema';
     ]),
     ModerationModule,
     CloudinaryModule,
+    QdrantModule,
     AiModule,
     MailModule,
     NotificationsModule,  ],

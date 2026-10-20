@@ -11,6 +11,7 @@ import { Comment, CommentDocument } from '../schemas/comment.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ModerationService } from '../common/moderation/moderation.service';
+import { QdrantService } from '../qdrant/qdrant.service';
 import { AiService } from 'src/ai/ai.service';
 import { MailService } from 'src/mail/mail.service';
 import { AppDownload, AppDownloadDocument } from '../schemas/app-download.schema';
@@ -33,6 +34,7 @@ export class PostsService {
     private mailService: MailService,
     private notificationsService: NotificationsService,
     private webPush: WebPushService,
+    private qdrant: QdrantService,
 // =======
     // private moderationService: ModerationService,
     // private aiService: AiService,
@@ -104,33 +106,14 @@ export class PostsService {
     const base64Image = fileBuffer.toString('base64');
 
     // 2️⃣ Appel à Gemini pour générer l'Embedding (la signature mathématique)
-    const response = await this.aiService.generateImageEmbedding(
+    const targetEmbedding = await this.aiService.generateImageEmbedding(
       base64Image,
       mimeType,
     );
 
-    const targetEmbedding = response; // Notre tableau de 1408 nombres
-
-    // 3️⃣ Requête vectorielle dans MongoDB Atlas
-    return this.postModel.aggregate([
-      {
-        $vectorSearch: {
-          index: 'vector_index_alertProche', // Le nom de ton index sur Atlas
-          path: 'imageEmbedding', // Le champ dans ton schéma MongoDB
-          queryVector: targetEmbedding, // Les 1408 nombres de l'image recherchée
-          numCandidates: 100, // Analyse les 100 documents les plus proches
-          limit: 5, // Renvoie le top 5 des meilleurs résultats
-        },
-      },
-      {
-        $project: {
-          title: 1,
-          imageUrl: 1,
-          location: 1,
-          score: { $meta: 'vectorSearchScore' }, // Donne la jauge de ressemblance (0 à 1)
-        },
-      },
-    ]);
+    // 3️⃣ Recherche vectorielle dans Qdrant (top 5)
+    //    Réponse : _id (identifiant de la publication) + score de similarité.
+    return this.qdrant.searchSimilar(targetEmbedding);
   }
 
   async create(
@@ -170,9 +153,13 @@ export class PostsService {
           type: dto.type,
           isAnonymous: dto.isAnonymous,
           image_url: imageUrl || null,
-          imageEmbedding: imageEmbedding,
           isActive: true,
         });
+
+        // Indexation du vecteur dans Qdrant (remplace l'ancien champ Mongo
+        // `imageEmbedding`). Un échec n'empêche jamais la publication : le post
+        // est seulement absent de la recherche par image jusqu'à ré-indexation.
+        await this.indexPostVector(post, imageEmbedding);
 
         if (dto.type == 'Disparition' || dto.type == 'Abus') {
           this.mailService.sendMailByLocation(post);
@@ -514,6 +501,43 @@ export class PostsService {
     // Supprimer en cascade les commentaires
     await this.commentModel.deleteMany({ post_id: new Types.ObjectId(id) });
     await this.postModel.findByIdAndDelete(id);
+
+    // Suppression du vecteur dans Qdrant. Non bloquant : si l'appel échoue, le
+    // point orphelin est de toute façon filtré côté frontend (qui ne garde que
+    // les _id présents dans sa liste de publications).
+    try {
+      await this.qdrant.deletePost(id);
+    } catch (err: any) {
+      this.logger.error(
+        `Suppression Qdrant échouée pour le post ${id}: ${err?.message ?? err}`,
+      );
+    }
+  }
+
+  /**
+   * Indexe (ou ré-indexe) le vecteur d'image d'une publication dans Qdrant.
+   * Échec non bloquant : loggé, la publication reste créée.
+   */
+  private async indexPostVector(post: any, vector: number[]): Promise<void> {
+    try {
+      await this.qdrant.upsertPost(
+        {
+          postId: post._id.toString(),
+          title: post.title,
+          location: post.location,
+          type: post.type,
+          image_url: post.image_url ?? null,
+          isActive: post.isActive ?? true,
+          isResolved: post.isResolved ?? false,
+          createdAt: post.createdAt ?? null,
+        },
+        vector,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Indexation Qdrant échouée pour le post ${post._id}: ${err?.message ?? err}`,
+      );
+    }
   }
 
   private async enrichPost(post: any, authorUser?: any) {
