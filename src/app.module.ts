@@ -14,6 +14,7 @@ import { TrackingModule } from './tracking/tracking.module';
 import { VersionsModule } from './versions/versions.module';
 import { FeedModule } from './feed/feed.module';
 import { ChatModule } from './chat/chat.module';
+import { MessagesModule } from './messages/messages.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -50,6 +51,7 @@ import { AppService } from './app.service';
     VersionsModule,
     FeedModule,
     ChatModule,
+    MessagesModule,
     PaymentsModule,
   ],
   controllers: [AppController],
