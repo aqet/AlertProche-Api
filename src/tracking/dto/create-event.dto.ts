@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsString, IsNumber, IsObject, IsDateString } from 'class-validator';
+import { IsUUID, IsOptional, IsString, IsNumber, IsObject, IsDateString, IsBoolean } from 'class-validator';
 
 export class CreateEventDto {
   @IsUUID('4')
@@ -25,6 +25,14 @@ export class CreateEventDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+
+  @IsOptional()
+  @IsBoolean()
+  isBot?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isStaff?: boolean;
 
   @IsDateString()
   timestamp: string;

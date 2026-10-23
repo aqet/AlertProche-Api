@@ -36,6 +36,32 @@ export class Post {
   @Prop({ type: [String], default: [] })
   reportReasons: string[];
 
+  /**
+   * IDs des membres ayant signalé l'alerte.
+   * Sert au signalement cumulatif : on sait qui et combien.
+   */
+  @Prop({ type: [String], default: [] })
+  reportedBy: string[];
+
+  /**
+   * IDs des membres ayant confirmé l'authenticité de l'alerte.
+   * Un membre ne peut avoir qu'une seule entrée (vote unique par personne).
+   */
+  @Prop({ type: [String], default: [] })
+  trustVotes: string[];
+
+  /** Nombre de votes de confirmation (dénormalisé pour le tri par fiabilité). */
+  @Prop({ default: 0 })
+  trustVoteCount: number;
+
+  /** Nombre de vues uniques de l'alerte (dénominateur du taux de confirmation). */
+  @Prop({ default: 0 })
+  viewsCount: number;
+
+  /** L'alerte a été jugée fausse par la modération (1 sanction). */
+  @Prop({ default: false })
+  isFalseAlert: boolean;
+
   @Prop({ type: Number, required: false })
   targetAmount?: number;
 
@@ -63,3 +89,4 @@ PostSchema.index({ createdAt: -1 });
 PostSchema.index({ isActive: 1 });
 PostSchema.index({ isReported: 1 });
 PostSchema.index({ isResolved: 1 });
+PostSchema.index({ trustVoteCount: -1 });

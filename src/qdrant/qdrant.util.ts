@@ -18,13 +18,13 @@ const NAMESPACE_BYTES = Buffer.from(
  *
  * Qdrant n'accepte que des UUID ou des entiers 64 bits comme identifiant de
  * point : un ObjectId Mongo n'est ni l'un ni l'autre. On dérive donc un UUID v5
- * (SHA-1 de `namespace + postId`) — déterministe, donc les upserts sont
+ * (SHA-1 de `namespace + postId`) - déterministe, donc les upserts sont
  * idempotents et les suppressions se font par identifiant direct.
  */
-export function postIdToPointId(postId: string): string {
+export function keyToPointId(key: string): string {
   const hash = createHash('sha1')
     .update(NAMESPACE_BYTES)
-    .update(String(postId))
+    .update(String(key))
     .digest();
 
   const bytes = Buffer.from(hash.subarray(0, 16));
@@ -39,4 +39,25 @@ export function postIdToPointId(postId: string): string {
     hex.slice(16, 20),
     hex.slice(20),
   ].join('-');
+}
+
+/**
+ * Identifiant du point principal d'une publication (collection `post_images`).
+ *
+ * ⚠️ Conserver exactement cette dérivation : elle est utilisée par les points
+ * déjà indexés en production.
+ */
+export function postIdToPointId(postId: string): string {
+  return keyToPointId(postId);
+}
+
+/**
+ * Identifiant d'un visage : `postId:faceIndex`.
+ *
+ * Une publication peut contenir plusieurs visages (photo de groupe) : chacun a
+ * son propre point, sinon on ne pourrait pas retrouver une personne en
+ * particulier.
+ */
+export function faceToPointId(postId: string, faceIndex: number): string {
+  return keyToPointId(`${postId}:${faceIndex}`);
 }
