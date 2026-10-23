@@ -69,4 +69,27 @@ export class AdminController {
   deletePost(@Param('id') id: string) {
     return this.adminService.hardDeletePost(id);
   }
+
+  // ─── CONFIANCE & RÉPUTATION ──────────────────────────────────────────────
+  // GET /admin/reputation - Comptes classés par réputation
+  @Get('reputation')
+  getReputation(@Query('limit') limit = '50') {
+    return this.adminService.getReputationOverview(+limit);
+  }
+
+  // PATCH /admin/users/:id/credibility - Ajustement manuel du score
+  @Patch('users/:id/credibility')
+  adjustCredibility(
+    @Param('id') id: string,
+    @Body() body: { delta: number },
+    @Request() req: any,
+  ) {
+    return this.adminService.adjustCredibility(id, Number(body?.delta) || 0, req.user);
+  }
+
+  // DELETE /admin/users/:id/strike - Retirer un avertissement (erreur du staff)
+  @Delete('users/:id/strike')
+  removeStrike(@Param('id') id: string) {
+    return this.adminService.removeStrike(id);
+  }
 }

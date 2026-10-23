@@ -151,7 +151,7 @@ export class MessagesService {
       unreadAgg.map((r) => [r._id.toString(), r.count as number]),
     );
 
-    // Snapshot de l'interlocuteur (pseudo/photo) — depuis les users si absent
+    // Snapshot de l'interlocuteur (pseudo/photo) - depuis les users si absent
     const peerIds = conversations.map((c) => {
       const other = c.participants.find((p: any) => p.toString() !== meId);
       return other as Types.ObjectId;

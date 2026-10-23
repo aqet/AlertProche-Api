@@ -26,7 +26,7 @@ try {
   ({ postIdToPointId } = require(path.join(API_DIR, 'dist', 'qdrant', 'qdrant.util.js')));
 } catch {
   console.error(
-    '❌ dist/qdrant/qdrant.util.js introuvable — lancez d\'abord : npm run build',
+    '❌ dist/qdrant/qdrant.util.js introuvable - lancez d\'abord : npm run build',
   );
   process.exit(1);
 }
@@ -113,7 +113,7 @@ async function main() {
 
   if (!qdrantConfigured) {
     console.log(
-      '⚠️  QDRANT_URL absent ou non renseigné dans .env — opérations Qdrant impossibles.',
+      '⚠️  QDRANT_URL absent ou non renseigné dans .env - opérations Qdrant impossibles.',
     );
     if (STATUS || CLEAN) await mongoose.disconnect();
     if (CLEAN) {
@@ -217,7 +217,7 @@ async function main() {
   const points = await qdrantPointCount();
   console.log(`▶ Qdrant : ${points} point(s) après migration.`);
 
-  // Vérification 2 : chaque vecteur doit se retrouver lui-même en top-1
+  // Vérification 2 : chaque vecteur doit se retrouver lui-même dans le top-5
   console.log('▶ Vérification par self-search…');
   let ok = 0;
   const failures = [];
@@ -225,14 +225,23 @@ async function main() {
     const expectedId = postIdToPointId(doc._id.toString());
     const result = await qdrantRequest('POST', `/collections/${COLLECTION}/points/query`, {
       query: doc.imageEmbedding,
-      limit: 1,
+      limit: 5,
       with_payload: true,
     });
-    const best = result?.result?.points?.[0];
-    if (best && String(best.id) === expectedId) {
+    const points = result?.result?.points ?? [];
+    const self = points.find((p) => String(p.id) === expectedId);
+    // Les publications en doublon (même image) partagent le même vecteur : le
+    // top-1 peut être l'autre doublon avec un score ~1. On accepte donc le point
+    // attendu dans le top-5 s'il est à un score quasi parfait.
+    if (self && (self.score ?? 0) >= 0.999) {
       ok += 1;
     } else {
-      failures.push({ postId: doc._id.toString(), got: best?.id ?? null, expected: expectedId });
+      failures.push({
+        postId: doc._id.toString(),
+        expected: expectedId,
+        expectedScore: self?.score ?? null,
+        top1: points[0]?.id ?? null,
+      });
     }
   }
 
@@ -244,7 +253,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('✅ Phase 1 terminée — MongoDB est INTACT.');
+  console.log('✅ Phase 1 terminée - MongoDB est INTACT.');
   console.log('   Testez la recherche par image, puis lancez :');
   console.log('     node scripts/migrate-vectors.js --clean');
   await mongoose.disconnect();

@@ -10,6 +10,7 @@ import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
@@ -52,8 +53,19 @@ export class PostsController {
   ) {}
 
   @Get()
-  findAll(@Query('type') type?: string, @Query('location') location?: string) {
-    return this.postsService.findAll({ type, location });
+  @UseGuards(OptionalJwtAuthGuard)
+  findAll(
+    @Request() req: any,
+    @Query('type') type?: string,
+    @Query('location') location?: string,
+    @Query('sort') sort?: 'reliability' | 'recent',
+  ) {
+    return this.postsService.findAll({
+      type,
+      location,
+      sort,
+      viewerId: req?.user?._id?.toString(),
+    });
   }
 
   @Get('my-posts')
@@ -80,8 +92,9 @@ export class PostsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postsService.findOne(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  findOne(@Param('id') id: string, @Request() req: any) {
+    return this.postsService.findOne(id, req?.user?._id?.toString());
   }
 
   @Post('validate-city')
@@ -156,12 +169,32 @@ export class PostsController {
   }
 
   @Post('search-by-image')
-  @UseInterceptors(FileInterceptor('image')) // Intercepte le fichier nommé 'image'
-  async searchByImage(@UploadedFile() file: Express.Multer.File) {
-    
-    // 💡 Ici, 'file.buffer' contient tes octets bruts (ex: <Buffer 89 50 4e 47...>)
-    // On passe le buffer et le type (image/png) au service
-    return this.postsService.searchSimilarImages(file.buffer, file.mimetype);
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: MAX_SIZE },
+    }),
+  )
+  async searchByImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    // Endpoint biométrique : réservé aux utilisateurs authentifiés
+    // (protection contre l'utilisation anonyme comme moteur d'identification).
+    if (!file) {
+      throw new BadRequestException('Image manquante.');
+    }
+    if (file.size > MAX_SIZE) {
+      throw new BadRequestException("L'image dépasse 5 Mo.");
+    }
+
+    return this.postsService.searchSimilarImages(
+      file.buffer,
+      file.mimetype,
+      req.user?._id?.toString(),
+    );
   }
 
   @Patch(':id/resolve')
@@ -192,8 +225,41 @@ export class PostsController {
   @Post(':id/report')
   @UseGuards(JwtAuthGuard)
   // @HttpCode(HttpStatus.NO_CONTENT)
-  async report(@Param('id') id: string, @Body() body: ReportDto) {
-    return await this.postsService.report(id, body.reason || 'Non précisé');
+  async report(@Param('id') id: string, @Body() body: ReportDto, @Request() req: any) {
+    return await this.postsService.report(
+      id,
+      body.reason || 'Non précisé',
+      req.user,
+    );
+  }
+
+  /**
+   * Vote de confirmation « Je confirme cette alerte ».
+   * Bascule on/off : un second appel retire le vote.
+   */
+  @Post(':id/confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  confirm(@Param('id') id: string, @Request() req: any) {
+    return this.postsService.confirm(id, req.user);
+  }
+
+  /** Incrémente le compteur de vues (appelé à l'ouverture de l'alerte). */
+  @Post(':id/view')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async registerView(@Param('id') id: string) {
+    await this.postsService.incrementView(id);
+  }
+
+  /**
+   * Décision du staff : l'alerte est confirmée fausse.
+   * Seul chemin vers la réputation négative (1 avertissement sur le compte).
+   */
+  @Patch(':id/false-alert')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Moderateur', 'Admin')
+  markFalseAlert(@Param('id') id: string, @Request() req: any) {
+    return this.postsService.markFalseAlert(id, req.user);
   }
 
   @Delete(':id/report')

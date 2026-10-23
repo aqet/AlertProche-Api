@@ -29,6 +29,14 @@ export class CreateSessionDto {
   @IsBoolean()
   isNewVisitor: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  isBot?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isStaff?: boolean;
+
   @IsDateString()
   startedAt: string;
 }

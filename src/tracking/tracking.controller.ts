@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { TrackingService } from './tracking.service';
+import { AnalyticsService } from './analytics.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EndSessionDto } from './dto/end-session.dto';
@@ -13,87 +14,70 @@ import { Roles } from '../auth/roles.decorator';
 
 @Controller('tracking')
 export class TrackingController {
-  constructor(private readonly trackingService: TrackingService) {}
+  constructor(
+    private readonly trackingService: TrackingService,
+    private readonly analytics: AnalyticsService,
+  ) {}
 
   // ── Endpoints de collecte (pas de JWT - accessibles à tous) ──────
+  //
+  // On attend la persistance avant de répondre : sur Vercel, une promesse
+  // lancée « en arrière-plan » peut être tuée avec l'instance, ce qui faisait
+  // perdre des sessions et faussait les statistiques.
 
-  // Répond 202 immédiatement, persiste en arrière-plan
   @Post('session')
   @HttpCode(HttpStatus.ACCEPTED)
-  createSession(@Body() dto: CreateSessionDto, @Req() req: Request) {
-    this.trackingService.persistSession(dto, req).catch(() => {});
-    return;
+  async createSession(@Body() dto: CreateSessionDto, @Req() req: Request) {
+    try {
+      await this.trackingService.persistSession(dto, req);
+    } catch {
+      // Le tracking ne doit jamais casser l'expérience utilisateur.
+    }
   }
 
   @Post('pageview')
   @HttpCode(HttpStatus.ACCEPTED)
-  createPageview(@Body() dto: CreateEventDto) {
-    this.trackingService.persistPageview(dto).catch(() => {});
-    return;
+  async createPageview(@Body() dto: CreateEventDto) {
+    try {
+      await this.trackingService.persistPageview(dto);
+    } catch {
+      // silencieux
+    }
   }
 
   @Post('event')
   @HttpCode(HttpStatus.ACCEPTED)
-  createEvent(@Body() dto: CreateEventDto) {
-    this.trackingService.persistEvent(dto).catch(() => {});
-    return;
+  async createEvent(@Body() dto: CreateEventDto) {
+    try {
+      await this.trackingService.persistEvent(dto);
+    } catch {
+      // silencieux
+    }
   }
 
   @Patch('session/:sessionId/end')
   @HttpCode(HttpStatus.ACCEPTED)
-  endSession(@Param('sessionId') sessionId: string, @Body() dto: EndSessionDto) {
-    this.trackingService.endSession(sessionId, dto).catch(() => {});
-    return;
+  async endSession(@Param('sessionId') sessionId: string, @Body() dto: EndSessionDto) {
+    try {
+      await this.trackingService.endSession(sessionId, dto);
+    } catch {
+      // silencieux
+    }
   }
 
   // ── Endpoints analytics (JWT + rôle Admin) ───────────────────────
 
-  @Get('analytics/overview')
+  @Get('analytics/audience')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Admin')
-  getOverview(@Query('period') period = '30d') {
-    return this.trackingService.getOverview(period);
+  getAudience(@Query('period') period = '30d') {
+    return this.analytics.getAudience(period);
   }
 
-  @Get('analytics/pages')
+  @Get('analytics/mission')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Admin')
-  getPages(@Query('period') period = '30d') {
-    return this.trackingService.getTopPages(period);
-  }
-
-  @Get('analytics/geo')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
-  getGeo(@Query('period') period = '30d') {
-    return this.trackingService.getGeo(period);
-  }
-
-  @Get('analytics/devices')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
-  getDevices(@Query('period') period = '30d') {
-    return this.trackingService.getDevices(period);
-  }
-
-  @Get('analytics/sources')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
-  getSources(@Query('period') period = '30d') {
-    return this.trackingService.getSources(period);
-  }
-
-  @Get('analytics/activity')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
-  getActivity(@Query('period') period = '30d') {
-    return this.trackingService.getActivity(period);
-  }
-
-  @Get('analytics/top-posts')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
-  getTopPosts(@Query('period') period = '30d') {
-    return this.trackingService.getTopPosts(period);
+  getMission(@Query('period') period = '30d') {
+    return this.analytics.getMission(period);
   }
 }

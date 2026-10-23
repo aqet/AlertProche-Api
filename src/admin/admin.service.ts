@@ -168,4 +168,102 @@ export class AdminService {
     await this.commentModel.deleteMany({ post_id: new Types.ObjectId(postId) });
     await this.postModel.findByIdAndDelete(postId);
   }
+
+  // ─── CONFIANCE & RÉPUTATION ──────────────────────────────────────────────
+  /**
+   * Vue d'ensemble de la réputation : les comptes les moins crédibles et
+   * les accounts sous avertissement remontent en tête.
+   */
+  async getReputationOverview(limit = 50): Promise<any> {
+    const users = await this.userModel
+      .find({})
+      .select('-password -token')
+      .sort({ strikes: -1, credibility: 1, createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const enriched = await Promise.all(
+      users.map(async (u: any) => {
+        const [postCount, confirmedCount] = await Promise.all([
+          this.postModel.countDocuments({ author_id: u._id }),
+          this.postModel.countDocuments({
+            author_id: u._id,
+            trustVoteCount: { $gte: 5 },
+          }),
+        ]);
+        return {
+          _id: u._id.toString(),
+          pseudo: u.pseudo,
+          email: u.email,
+          role: u.role,
+          credibility: u.credibility ?? 0,
+          strikes: u.strikes ?? 0,
+          confirmedAlerts: u.confirmedAlerts ?? 0,
+          resolvedAlerts: u.resolvedAlerts ?? 0,
+          lastStrikeAt: u.lastStrikeAt ?? null,
+          strikeReasons: u.strikeReasons ?? [],
+          createdAt: u.createdAt,
+          postCount,
+          confirmedCount,
+        };
+      }),
+    );
+
+    return { users: enriched };
+  }
+
+  /** Ajustement manuel de la réputation (staff). */
+  async adjustCredibility(
+    userId: string,
+    delta: number,
+    requestingUser: any,
+  ) {
+    if (!Types.ObjectId.isValid(userId))
+      throw new NotFoundException('Utilisateur introuvable.');
+
+    const user = await this.userModel.findById(userId).select('-password');
+    if (!user) throw new NotFoundException('Utilisateur introuvable.');
+
+    const credibility = Math.max(
+      0,
+      Math.min(100, (user.credibility ?? 0) + delta),
+    );
+    user.credibility = credibility;
+    await user.save();
+
+    return {
+      success: true,
+      _id: user._id.toString(),
+      pseudo: user.pseudo,
+      credibility: user.credibility,
+      strikes: user.strikes ?? 0,
+    };
+  }
+
+  /** Retire un avertissement (erreur du staff) et restitue les points. */
+  async removeStrike(userId: string) {
+    if (!Types.ObjectId.isValid(userId))
+      throw new NotFoundException('Utilisateur introuvable.');
+
+    const user = await this.userModel.findById(userId).select('-password');
+    if (!user) throw new NotFoundException('Utilisateur introuvable.');
+
+    const strikes = Math.max(0, (user.strikes ?? 0) - 1);
+    const credibility = Math.min(100, (user.credibility ?? 0) + 10);
+    const strikeReasons = [...(user.strikeReasons ?? [])];
+    strikeReasons.pop();
+
+    user.strikes = strikes;
+    user.credibility = credibility;
+    user.strikeReasons = strikeReasons;
+    await user.save();
+
+    return {
+      success: true,
+      _id: user._id.toString(),
+      pseudo: user.pseudo,
+      credibility: user.credibility,
+      strikes: user.strikes,
+    };
+  }
 }

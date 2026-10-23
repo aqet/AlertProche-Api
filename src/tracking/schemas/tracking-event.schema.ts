@@ -38,11 +38,21 @@ export class TrackingEvent {
   @Prop({ type: Object })
   metadata?: Record<string, any>;
 
+  @Prop({ default: false })
+  isBot: boolean;
+
+  @Prop({ default: false })
+  isStaff: boolean;
+
   @Prop({ required: true })
   timestamp: Date;
 }
 
 export const TrackingEventSchema = SchemaFactory.createForClass(TrackingEvent);
+
+// Index d'agrégation : événements par type et par période.
+TrackingEventSchema.index({ type: 1, timestamp: -1 });
+TrackingEventSchema.index({ isBot: 1, timestamp: -1 });
 
 // TTL index : suppression automatique après 90 jours
 TrackingEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });

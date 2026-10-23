@@ -71,6 +71,48 @@ export class User {
   @Prop({ type: Boolean, default: false })
   disableProximityAlerts: boolean;
 
+  /* ── Confiance & réputation ──────────────────────────────────────
+     Deux axes volontairement séparés :
+     - `credibility` : score positif (0-100), public sous forme de badge.
+     - `strikes`     : sanctions, PRIVÉES (staff uniquement), jamais publiques
+       pour éviter tout harcèlement d'une famille en deuil. */
+
+  /** Score de confiance positif (0-100). */
+  @Prop({ default: 0, min: 0, max: 100 })
+  credibility: number;
+
+  /** Nombre d'avertissements (fauxes alertes confirmées par le staff). */
+  @Prop({ default: 0 })
+  strikes: number;
+
+  /** Nombre d'alertes de ce compte cautionnées par la communauté. */
+  @Prop({ default: 0 })
+  confirmedAlerts: number;
+
+  /** Nombre d'alertes de ce compte effectivement résolues. */
+  @Prop({ default: 0 })
+  resolvedAlerts: number;
+
+  /**
+   * Points de crédibilité déjà gagnés en confirmant les alertes des autres.
+   * Sert uniquement à appliquer le plafond (MAX_POINTS_FROM_VOTES) : on peut
+   * monter en réputation par la participation, mais pas indéfiniment.
+   */
+  @Prop({ default: 0 })
+  voteCredibilityPoints: number;
+
+  /** Dernière attribution d'un point de participation (1 par jour max). */
+  @Prop({ type: Date, default: null })
+  lastVotePointAt?: Date | null;
+
+  /** Date du dernier avertissement (affiche un délai d'attente pour l'admin). */
+  @Prop({ type: Date, default: null })
+  lastStrikeAt?: Date | null;
+
+  /** Historique privé des motifs d'avertissement (staff uniquement). */
+  @Prop({ type: [String], default: [] })
+  strikeReasons: string[];
+
   // Dernière position GPS connue (mise à jour lors des SOS actifs)
   @Prop({
     type: {
