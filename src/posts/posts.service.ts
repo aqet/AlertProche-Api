@@ -29,6 +29,7 @@ import { WebPushService } from '../notifications/web-push.service';
 import { User, UserDocument } from 'src/schemas/user.schema';
 import { TrustService, TRUST_RULES } from './trust.service';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
+import { FeedService } from '../feed/feed.service';
 
 /**
  * Types de publication qui peuvent être confirmés par la communauté.
@@ -66,6 +67,7 @@ export class PostsService {
     private qdrant: QdrantService,
     private faces: FacesService,
     private trustService: TrustService,
+    private feedService: FeedService,
 // =======
     // private moderationService: ModerationService,
     // private aiService: AiService,
@@ -411,10 +413,70 @@ export class PostsService {
         this.sendNewPostNotification(post.title, post._id.toString()).catch(err =>
           this.logger.error('sendNewPostNotification échoué', err)
         );
+
+        // 🤖 Génération d'image IA + création du post feed en arrière-plan
+        // Non bloquant : l'utilisateur reçoit son post immédiatement, l'IA travaille ensuite
+        this.generateAndPublishFeedPost(
+          post,
+          user,
+          file ?? null,
+        ).catch(err => this.logger.error('generateAndPublishFeedPost échoué', err));
+
 // >>>>>>> d28424319267cfc0609fd2fa04ac0ea7a98ac44e
         return this.enrichPost(post.toObject(), user);
       }
     }
+  }
+
+  /**
+   * Pipeline arrière-plan : génère une caption courte + une image via Puppeteer/Gemini,
+   * puis publie automatiquement dans le feed.
+   * Toute erreur est loguée mais n'affecte pas le post principal.
+   */
+  private async generateAndPublishFeedPost(
+    post: any,
+    user: any,
+    file: Express.Multer.File | null,
+  ): Promise<void> {
+    this.logger.log(`🎨 [IA FEED] Début génération pour le post ${post._id}...`);
+
+    // Récupérer les infos auteur
+    const author = await this.userModel
+      .findById(user._id)
+      .select('pseudo photoUrl')
+      .lean();
+
+    const postData = {
+      title:    post.title,
+      type:     post.type,
+      location: post.location,
+      content:  post.content,
+    };
+
+    // Lancer caption et image en parallèle pour gagner du temps
+    const [caption, aiImageBuffer] = await Promise.all([
+      this.aiService.generateFeedCaption(postData),
+      this.aiService.generatePostImage({
+        ...postData,
+        imageBase64: file?.buffer?.toString('base64'),
+        mimeType:    file?.mimetype,
+      }),
+    ]);
+
+    await this.feedService.createFeedPostFromAlert({
+      postId:        post._id.toString(),
+      title:         post.title,
+      content:       post.content,
+      type:          post.type,
+      location:      post.location,
+      authorId:      user._id.toString(),
+      authorPseudo:  author?.pseudo ?? user.pseudo ?? 'AlertProche',
+      authorPhoto:   author?.photoUrl ?? user.photoUrl ?? null,
+      aiImageBuffer,
+      caption,
+    });
+
+    this.logger.log(`✅ [IA FEED] Post feed publié pour l'alerte ${post._id}`);
   }
 
   /**

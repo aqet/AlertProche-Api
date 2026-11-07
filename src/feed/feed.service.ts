@@ -275,4 +275,70 @@ export class FeedService {
       $inc: { commentsCount: delta },
     });
   }
+
+  /**
+   * Crée automatiquement un post dans le feed à partir d'une alerte citoyenne.
+   * Appelé en arrière-plan après la création d'un post d'alerte.
+   * L'image générée par l'IA est uploadée sur Cloudinary avant d'être attachée au feed.
+   */
+  async createFeedPostFromAlert(params: {
+    postId:        string;
+    title:         string;
+    content:       string;
+    type:          string;
+    location:      string;
+    authorId:      string;
+    authorPseudo:  string;
+    authorPhoto:   string | null;
+    aiImageBuffer: Buffer | null;
+    caption:       string;          // texte court reformulé par l'IA
+  }): Promise<void> {
+    try {
+      // 1. Créer le post feed avec la caption courte
+      const post = await this.feedModel.create({
+        author: {
+          userId:   new Types.ObjectId(params.authorId),
+          pseudo:   params.authorPseudo,
+          photoUrl: params.authorPhoto,
+        },
+        content:       params.caption,
+        location:      params.location,
+        mediaType:     'none',
+        mediaUrls:     [],
+        likesCount:    0,
+        commentsCount: 0,
+        sharesCount:   0,
+        likedBy:       [],
+      });
+
+      // 2. Si l'IA a généré une image, on l'upload sur Cloudinary et on met à jour
+      if (params.aiImageBuffer) {
+        try {
+          const filename = `alert-${params.postId}-${Date.now()}.png`;
+          const result = await this.cloudinary.uploadFeedMedia(
+            params.aiImageBuffer,
+            filename,
+            'image',
+          );
+
+          await this.feedModel.findByIdAndUpdate(post._id, {
+            $set: {
+              mediaType:        'image',
+              mediaUrls:        [result.url],
+              mediaFileTypes:   ['image'],
+              cloudinaryAssets: [{ publicId: result.publicId, resourceType: 'image' }],
+            },
+          });
+
+          this.logger.log(`✅ Post feed IA créé pour l'alerte ${params.postId} avec image`);
+        } catch (uploadErr: any) {
+          this.logger.warn(`⚠️ Upload image IA échoué: ${uploadErr?.message}. Post feed sans image.`);
+        }
+      } else {
+        this.logger.log(`📝 Post feed créé pour l'alerte ${params.postId} sans image`);
+      }
+    } catch (err: any) {
+      this.logger.error(`❌ Échec création post feed depuis alerte ${params.postId}: ${err?.message}`);
+    }
+  }
 }
