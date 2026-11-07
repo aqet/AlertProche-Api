@@ -12,11 +12,9 @@ import { FacesModule } from '../faces/faces.module';
 import { AiModule } from 'src/ai/ai.module';
 import { MailModule } from 'src/mail/mail.module';
 import { AppDownload, AppDownloadSchema } from '../schemas/app-download.schema';
-
 import { NotificationsModule } from '../notifications/notifications.module';
-
-//  d28424319267cfc0609fd2fa04ac0ea7a98ac44e
 import { User, UserSchema } from 'src/schemas/user.schema';
+import { FeedModule } from '../feed/feed.module';
 
 @Module({
   imports: [
@@ -25,7 +23,6 @@ import { User, UserSchema } from 'src/schemas/user.schema';
       { name: User.name, schema: UserSchema },
       { name: Comment.name, schema: CommentSchema },
       { name: AppDownload.name, schema: AppDownloadSchema },
-      { name: User.name, schema: UserSchema },
     ]),
     ModerationModule,
     CloudinaryModule,
@@ -33,7 +30,9 @@ import { User, UserSchema } from 'src/schemas/user.schema';
     FacesModule,
     AiModule,
     MailModule,
-    NotificationsModule,  ],
+    NotificationsModule,
+    FeedModule,
+  ],
   controllers: [PostsController],
   providers: [PostsService, TrustService],
   exports: [PostsService, TrustService],
