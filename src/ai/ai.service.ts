@@ -14,10 +14,11 @@ export interface ModerationResult {
 // 💡 C'est l'interface stricte qui map tes champs de formulaire
 export interface FormCompletionResult {
   publicationType: 'Disparition' | 'Abus' | 'Prevention' | 'Appel à l\'aide' | 'UNKNOWN';
-  alertTitle: string;        // ex: "Détresse : Grand-mère Magoubah Madeleine à Yaoundé"
-  detailedDescription: string; // Le résumé complet tiré de l'image
-  cityName: string;          // La ville extraite (ex: "Yaoundé")
+  alertTitle: string;
+  detailedDescription: string;
+  cityName: string;
   confidence: number;
+  insufficientData?: boolean; // true si l'image ne contient pas assez d'infos
 }
 
 // 💡 Interface pour le résultat d'analyse audio → formulaire
@@ -46,14 +47,14 @@ export class AiService {
 
   // 💡 Ordre de priorité : on met les modèles économiques/rapides d'abord, puis les plus costauds
   private modelNames = [
-    'gemini-2.5-flash-lite', 
+    'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.5-flash-tts',
     'gemini-2.0-flash-lite',
     'gemini-2.0-flash',
     'gemini-2.5-pro',
-    'gemini-3-flash' ,
-    'gemini-3.5-flash' 
+    'gemini-3-flash',
+    'gemini-3.5-flash'
   ];
 
   // Tableau de failover pour la vision (les modèles Flash actuels)
@@ -61,12 +62,12 @@ export class AiService {
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash-lite',
-    'gemini-2.0-flash' ,
-    'gemini-3-flash' ,
-    'gemini-3.5-flash' 
+    'gemini-2.0-flash',
+    'gemini-3-flash',
+    'gemini-3.5-flash'
   ];
- 
-  async moderateContent(postContent: string, reportReason?: string): Promise<ModerationResult> {
+
+  async moderateContent(postContent: string, reportReason?: string, postType?: string): Promise<ModerationResult> {
     // 💡 On boucle sur chaque modèle disponible dans notre liste
     for (const model of this.modelNames) {
       try {
@@ -74,15 +75,30 @@ export class AiService {
 
         const response = await this.ai.models.generateContent({
           model: model, // 👈 Attribution dynamique du modèle
-          contents: `Contenu du post à analyser : "${postContent}"\nRaison invoquée pour le signalement : "${reportReason || 'Non précisé'}"`,
+          contents: `Type de signalement : "${postType || 'Non précisé'}"\nContenu du post à analyser : "${postContent}"\nRaison invoquée pour le signalement : "${reportReason || 'Non précisé'}"`,
           config: {
-            systemInstruction: `Tu es un expert en modération pour une plateforme citoyenne de sécurité et de recherche de personnes. 
-            Analyse si le contenu viole les règles (haine, faux signalement, harcèlement, contenu inapproprié).
-            Tu devez obligatoirement répondre sous format JSON contenant exactement ces trois clés :
-            - "decision" : (valeur stricte : "APPROVE" si le post est correct, ou "BAN" s'il doit être suspendu).
-            - "confidence" : (un nombre décimal entre 0.0 et 1.0 indiquant ton niveau de certitude).
-            - "reasoning" : (une courte phrase en français expliquant ton choix).`,
-            
+            systemInstruction: `Tu es un modérateur expert pour AlertProche, une plateforme citoyenne de sécurité et de recherche de personnes au Cameroun.
+
+CONTEXTE IMPORTANT : Cette plateforme sert à signaler des faits réels (agressions, disparitions, abus, violences) pour alerter la communauté et aider les victimes. Les descriptions de violence, blessures, agressions ou abus sur mineurs sont NORMALES et ATTENDUES car ce sont des témoignages citoyens factuels. Un signalement qui décrit une agression au couteau, des coups, des violences sexuelles ou des sévices sur enfant doit être APPROUVÉ car c'est précisément le but de la plateforme.
+
+Tu dois approuver SAUF si le contenu est :
+- De la haine raciale, ethnique ou religieuse (incitation à la haine)
+- Du harcèlement ciblé contre une personne nommée sans rapport avec un fait réel
+- De la désinformation manifeste ou un canular évident
+- Du contenu sexuel explicite non lié à un signalement d'abus
+- De la publicité ou du spam déguisé
+
+Tu dois APPROUVER :
+- Les descriptions de violences physiques (coups, armes, blessures) car ce sont des faits rapportés
+- Les signalements d'abus sur mineurs, même explicites, car c'est une alerte de protection
+- Les récits d'agression sexuelle car les victimes ont besoin d'être entendues
+- Tout témoignage factuel même choquant, tant qu'il relate un événement réel
+
+Réponds UNIQUEMENT en JSON avec exactement ces trois clés :
+- "decision" : "APPROVE" ou "BAN"
+- "confidence" : nombre décimal entre 0.0 et 1.0
+- "reasoning" : courte phrase en français expliquant ton choix`,
+
             responseMimeType: 'application/json',
           },
         });
@@ -99,7 +115,7 @@ export class AiService {
       } catch (error: any) {
         // En cas d'erreur (Quota 429, Modèle introuvable 404, Panne 503...)
         console.warn(`⚠️ Échec avec le modèle ${model}. Code erreur : ${error.status || error.message}. Passage au modèle suivant...`);
-        
+
         // La boucle continue automatiquement vers le modèle suivant du tableau
       }
     }
@@ -114,7 +130,7 @@ export class AiService {
   }
 
   async autocompleteFormFromImage(imageBase64: string, mimeType: string): Promise<FormCompletionResult> {
-    
+
     // Préparation de l'image pour le SDK Google
     const imagePart = {
       inlineData: {
@@ -139,11 +155,13 @@ export class AiService {
             systemInstruction: `Tu es un assistant de saisie d'alertes citoyennes pour une plateforme de sécurité. 
             Analyse l'image (photo + texte intégré) et extrait les données sous format JSON strict avec exactement ces clés et types :
             - "publicationType" : (valeur stricte : 'Disparition', 'Abus', 'Prevention', 'Appel à l\'aide' ou "UNKNOWN". Choisis la catégorie la plus pertinente).
-            - "alertTitle" : Une phrase d'accroche résumant l'urgence (Maximum 150 caractères).
-            - "detailedDescription" : Un résumé textuel complet et cohérent de la situation, reprenant le nom des personnes, l'action, l'urgence et les détails géographiques.
-            - "cityName" : Le nom précis de la ville ou commune principale mentionnée. Si plusieurs, choisis la principale. Si aucune, écris "".
-            - "confidence" : Ton score de certitude global entre 0.0 et 1.0.`,
-            
+            - "alertTitle" : Une phrase d'accroche résumant l'urgence (Maximum 150 caractères). Chaine vide "" si impossible.
+            - "detailedDescription" : Un résumé textuel complet et cohérent de la situation. Chaine vide "" si impossible.
+            - "cityName" : Le nom précis de la ville ou commune principale mentionnée. Chaine vide "" si aucune.
+            - "confidence" : Ton score de certitude global entre 0.0 et 1.0.
+            - "insufficientData" : true si l'image est une photo ordinaire sans texte ni information d'alerte (paysage, selfie, objet, photo personnelle), false sinon.
+            Si l'image ne contient pas de texte lisible ni d'éléments d'alerte, mets insufficientData à true et laisse les autres champs vides.`,
+
             responseMimeType: 'application/json',
           },
         });
@@ -153,7 +171,6 @@ export class AiService {
         const result: FormCompletionResult = JSON.parse(response.text);
         console.log(`✅ Autocomplétion réussie avec ${model} (Ville détectée : ${result.cityName})`);
         return result;
-
       } catch (error: any) {
         console.warn(`⚠️ Échec visuel avec le modèle ${model}. Code : ${error.status || error.message}. Passage au suivant...`);
       }
@@ -297,7 +314,7 @@ Réponds UNIQUEMENT avec un objet JSON : {"valid": true|false, "normalizedName":
       },
     };
 
-    const systemInstruction = `Tu es un assistant d'extraction de données pour une application de sécurité d'urgence au Cameroun.
+    const systemInstruction = `Tu es un assistant d'extraction de données pour une application de sécurité d'urgence.
 Écoute cet extrait audio et extrais toutes les informations pertinentes pour remplir une fiche d'alerte citoyenne.
 Ignore les bruits de fond, les hésitations ("euh", "hm") et les répétitions.
 Réponds EXCLUSIVEMENT avec un objet JSON valide contenant exactement ces clés :
@@ -343,7 +360,8 @@ Si une information est absente ou incertaine, indique null pour ce champ.`;
     return FALLBACK;
   }
 
-  async generateImageEmbedding(imageBase64: string, mimeType: string): Promise<number[]> {    try {
+  async generateImageEmbedding(imageBase64: string, mimeType: string): Promise<number[]> {
+    try {
       console.log(`[IA EMBEDDING] Calcul de la signature vectorielle de la photo...`);
 
       const response = await this.ai.models.embedContent({
@@ -369,7 +387,7 @@ Si une information est absente ou incertaine, indique null pour ce champ.`;
     } catch (error: any) {
       console.error(`❌ Échec du calcul de l'embedding :`, error.message);
       throw new InternalServerErrorException("Impossible d'analyser l'empreinte visuelle de l'image.");
-  }
+    }
   }
 
   /**
@@ -390,7 +408,7 @@ Si une information est absente ou incertaine, indique null pour ce champ.`;
     // ── Étape 1 : demander à Gemini de générer le HTML de l'affiche ──────
     let html = '';
     const cfg = this.typeConfig(post.type);
-    const c   = this.COLORS;
+    const c = this.COLORS;
     const htmlPrompt = `Tu es un designer expert. Génère uniquement le code HTML avec CSS inline d'une affiche d'alerte 1080x1080px pour AlertProche.
 
 Données de l'alerte :
@@ -440,7 +458,8 @@ Contraintes strictes :
         if (html.includes('<body')) {
           console.log(`✅ HTML généré via ${model} (${html.length} chars)`);
           break;
-        }      } catch (err: any) {
+        }
+      } catch (err: any) {
         console.warn(`⚠️ Échec HTML avec ${model}: ${err?.message}`);
       }
     }
@@ -494,31 +513,31 @@ Contraintes strictes :
 
   // ── Couleurs du design system AlertProche ──────────────────────
   private readonly COLORS = {
-    green:      '#2E8B4A',
-    greenDark:  '#1B5232',
-    greenPale:  '#E9F2EC',
-    bg:         '#F5F6F6',
-    surface:    '#FFFFFF',
-    text:       '#1B1E1D',
-    textSub:    '#5A615C',
-    urgent:     '#E53935',
-    urgentDim:  'rgba(229,57,53,0.08)',
-    warning:    '#F57C00',
+    green: '#2E8B4A',
+    greenDark: '#1B5232',
+    greenPale: '#E9F2EC',
+    bg: '#F5F6F6',
+    surface: '#FFFFFF',
+    text: '#1B1E1D',
+    textSub: '#5A615C',
+    urgent: '#E53935',
+    urgentDim: 'rgba(229,57,53,0.08)',
+    warning: '#F57C00',
     warningDim: 'rgba(245,124,0,0.08)',
     prevention: '#1565C0',
-    prevDim:    'rgba(21,101,192,0.08)',
-    appel:      '#C2185B',
-    appelDim:   'rgba(194,24,91,0.08)',
+    prevDim: 'rgba(21,101,192,0.08)',
+    appel: '#C2185B',
+    appelDim: 'rgba(194,24,91,0.08)',
   };
 
   /** Config par type d'alerte : couleur principale, fond, label */
   private typeConfig(type: string): { accent: string; bg: string; label: string } {
     const c = this.COLORS;
     const map: Record<string, { accent: string; bg: string; label: string }> = {
-      'Disparition':    { accent: c.urgent,     bg: c.urgentDim,  label: 'DISPARITION'   },
-      'Abus':           { accent: c.warning,    bg: c.warningDim, label: 'ABUS'          },
-      'Prevention':     { accent: c.prevention, bg: c.prevDim,    label: 'PREVENTION'    },
-      "Appel à l'aide": { accent: c.appel,      bg: c.appelDim,   label: "APPEL A L'AIDE"},
+      'Disparition': { accent: c.urgent, bg: c.urgentDim, label: 'DISPARITION' },
+      'Abus': { accent: c.warning, bg: c.warningDim, label: 'ABUS' },
+      'Prevention': { accent: c.prevention, bg: c.prevDim, label: 'PREVENTION' },
+      "Appel à l'aide": { accent: c.appel, bg: c.appelDim, label: "APPEL A L'AIDE" },
     };
     return map[type] ?? { accent: c.green, bg: c.greenPale, label: type.toUpperCase() };
   }
@@ -571,14 +590,14 @@ Contraintes strictes :
   private buildFallbackHtml(
     post: { title: string; type: string; location: string; content: string },
   ): string {
-    const cfg   = this.typeConfig(post.type);
-    const c     = this.COLORS;
-    const logo  = this.LOGO_B64;
-    const safe  = (s: string) =>
-      s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const desc  = safe(post.content.slice(0, 180));
+    const cfg = this.typeConfig(post.type);
+    const c = this.COLORS;
+    const logo = this.LOGO_B64;
+    const safe = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const desc = safe(post.content.slice(0, 180));
     const title = safe(post.title);
-    const loc   = safe(post.location);
+    const loc = safe(post.location);
 
     return `<!DOCTYPE html>
 <html>

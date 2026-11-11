@@ -333,14 +333,14 @@ export class PostsService {
       );
     }
 
-    let aiResult = this.aiService.moderateContent(dto.title);
+    let aiResult = this.aiService.moderateContent(dto.title, undefined, dto.type);
     if (
       (await aiResult).decision == 'BAN' &&
       (await aiResult).confidence >= 0.9
     ) {
       return aiResult;
     } else {
-      aiResult = this.aiService.moderateContent(dto.content);
+      aiResult = this.aiService.moderateContent(dto.content, undefined, dto.type);
       if (
         (await aiResult).decision == 'BAN' &&
         (await aiResult).confidence >= 0.9
